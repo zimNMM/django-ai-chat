@@ -1,0 +1,95 @@
+<!-- templates/login.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        {% load static %}
+        <title>Login - DjangoAI</title>
+        <meta charset="UTF-8">
+        <meta name="csrf-token" content="{{ csrf_token }}">
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://kit.fontawesome.com/38683e14e9.js" crossorigin="anonymous"></script>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
+    </head>
+<body class="bg-gray-950 text-gray-100">
+    <div class="min-h-screen flex items-center justify-center">
+        <div class="auth-box w-full max-w-lg p-8 rounded-lg">
+            <div class="flex items-center mb-6">
+                <i class="fas fa-sign-in-alt text-4xl text-indigo-500 mr-4"></i>
+                <h2 class="text-2xl font-semibold">Login</h2>
+            </div>
+            
+            {% if form.non_field_errors %}
+                <div class="mb-4 text-red-500">
+                    {% for error in form.non_field_errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="mb-4">
+                    <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium mb-1 text-gray-300">
+                        Username
+                    </label>
+                    <input
+                        type="text"
+                        name="{{ form.username.name }}"
+                        id="{{ form.username.id_for_label }}"
+                        class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring focus:ring-indigo-500 text-white"
+                        required
+                    >
+                    {% if form.username.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.username.errors }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="mb-4">
+                    <label for="{{ form.password.id_for_label }}" class="block text-sm font-medium mb-1 text-gray-300">
+                        Password
+                    </label>
+                    <input
+                        type="password"
+                        name="{{ form.password.name }}"
+                        id="{{ form.password.id_for_label }}"
+                        class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring focus:ring-indigo-500 text-white"
+                        required
+                    >
+                    {% if form.password.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.password.errors }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="mb-6">
+                    <label for="{{ form.otp_token.id_for_label }}" class="block text-sm font-medium mb-1 text-gray-300">
+                        OTP Code
+                    </label>
+                    <input
+                        type="text"
+                        name="{{ form.otp_token.name }}"
+                        id="{{ form.otp_token.id_for_label }}"
+                        class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring focus:ring-indigo-500 text-white"
+                    >
+                    {% if form.otp_token.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.otp_token.errors }}</p>
+                    {% endif %}
+                </div>
+
+                <button type="submit" class="w-full px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition duration-200">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Login
+                </button>
+            </form>
+
+            <div class="mt-6 text-center">
+                <a href="{% url 'register' %}" class="text-indigo-400 hover:text-indigo-300 transition duration-200">
+                    Don't have an account? Register here
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

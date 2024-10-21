@@ -1,0 +1,739 @@
+<!--  templates/chat.html -->
+  
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        {% load static %}
+        <title>Chat - DjangoAI</title>
+        <meta charset="UTF-8">
+        <meta name="csrf-token" content="{{ csrf_token }}">
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://kit.fontawesome.com/38683e14e9.js" crossorigin="anonymous"></script>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+        <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
+        <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github-dark.min.css">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+        <script>hljs.highlightAll();</script>
+    </head>
+<body class="bg-gray-950 text-gray-100">
+    <div class="flex h-screen">
+        <aside class="w-72 bg-gray-800 flex flex-col shadow-lg">
+            <div class="p-6 flex items-center bg-gradient-to-r from-indigo-500 to-blue-500">
+                <i class="fas fa-robot text-3xl text-white mr-3"></i>
+                <span class="text-2xl font-bold text-white">DjangoAI</span>
+            </div>
+            <div class="px-6 py-4">
+                <button id="new-chat" class="w-full flex items-center justify-center px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none transition duration-200 shadow-md">
+                    <i class="fas fa-plus mr-2"></i> New Chat
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto px-2">
+                <ul id="conversations" class="space-y-2">
+                </ul>
+            </div>
+            <div class="px-6 py-4">
+                <button id="delete-all-button" class="w-full flex items-center justify-center px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none transition duration-200 shadow-md">
+                    <i class="fas fa-trash-alt mr-2"></i> Delete All
+                </button>
+            </div>
+        </aside>
+        <main class="flex-1 flex flex-col">
+            <header class="flex items-center justify-between bg-gray-800 px-8 py-4 border-b border-gray-700 shadow-md">
+                <div>
+                    <h2 class="text-2xl font-semibold">Chat with LLM</h2>
+                    <p id="conversation-title" class="text-sm text-gray-400">Select a conversation or start a new one.</p>
+                </div>
+                <div class="flex items-center space-x-6">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center">
+                            <span class="text-sm text-gray-300">Oobabooga API:</span>
+                            {% if txt_api_status == 'Online' %}
+                                <span class="text-sm text-green-500 ml-1">{{ txt_api_status }}</span>
+                            {% else %}
+                                <span class="text-sm text-red-500 ml-1">{{ txt_api_status }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="flex items-center">
+                            <span class="text-sm text-gray-300">Stable Diffusion API:</span>
+                            {% if img_api_status == 'Online' %}
+                                <span class="text-sm text-green-500 ml-1">{{ img_api_status }}</span>
+                            {% else %}
+                                <span class="text-sm text-red-500 ml-1">{{ img_api_status }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <button id="prompts-button" class="flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 focus:outline-none transition duration-200 shadow-md">
+                        <i class="fas fa-lightbulb mr-2"></i> Prompts
+                    </button>
+                    <div class="flex items-center">
+                        <div class="bg-gradient-to-r from-indigo-600 to-blue-500 rounded-xl px-4 py-2 shadow-lg">
+                            <div class="flex items-center space-x-2">
+                                <i class="fas fa-coins text-yellow-300"></i>
+                                <div>
+                                    <div class="text-white font-semibold credits">{{credits}}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <div class="relative">
+                    <button id="user-menu-button" class="flex items-center focus:outline-none">
+                        <div class="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold">
+                            {{ initials }}
+                        </div>
+                    </button>
+                    <div id="user-menu" class="dropdown-menu w-48">
+                        <a href="{% url 'profile' %}" class="block px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">
+                            <i class="fas fa-user-cog mr-2"></i> User Settings
+                        </a>
+                        <a id="export-conversations" href="#" class="block px-4 py-2 text-sm text-green-400 hover:bg-gray-700">
+                            <i class="fas fa-download mr-2"></i> Export Conversations
+                        </a>
+                        <form action="{% url 'logout' %}" method="post" class="block">
+                            {% csrf_token %}
+                            <button type="submit" class="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-gray-700">
+                                <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </header>
+            <section id="chat-window" class="flex-1 p-8 overflow-y-auto bg-gray-900">
+            </section>
+            <footer class="bg-gray-800 p-6">
+                <form id="message-form" class="flex items-center">
+                    <input type="text" name="message" id="message-input" placeholder="Type your message..."
+                        class="flex-1 p-4 rounded-l-lg bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 message-input" autocomplete="off">
+                    <button type="submit"
+                        class="bg-indigo-600 hover:bg-indigo-700 p-4 rounded-r-lg focus:outline-none transition duration-200 shadow-md">
+                        <i class="fas fa-paper-plane text-white text-lg"></i>
+                    </button>
+                    <button id="image-generation-button" type="button"
+                    class="bg-green-600 hover:bg-green-700 p-4 rounded ml-2 focus:outline-none transition duration-200 shadow-md">
+                    <i class="fas fa-image text-white text-lg"></i>
+                </button>
+                </form>
+            </footer>
+        </main>
+    </div>
+    <div id="delete-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="text-center">
+                <i class="fas fa-exclamation-triangle text-5xl text-yellow-500 mb-4"></i>
+                <h2 class="text-2xl font-bold mb-4">Delete Conversation</h2>
+                <p class="mb-6">Are you sure you want to delete this conversation? This action cannot be undone.</p>
+                <div class="flex justify-center space-x-4">
+                    <button id="cancel-delete" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition duration-200">
+                        <i class="fas fa-times mr-2"></i>Cancel
+                    </button>
+                    <button id="confirm-delete" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition duration-200">
+                        <i class="fas fa-trash-alt mr-2"></i>Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="delete-all-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="text-center">
+                <i class="fas fa-exclamation-triangle text-5xl text-yellow-500 mb-4"></i>
+                <h2 class="text-2xl font-bold mb-4">Delete All Conversations</h2>
+                <p class="mb-6">Are you sure you want to delete all your conversations? This action cannot be undone.</p>
+                <div class="flex justify-center space-x-4">
+                    <button id="cancel-delete-all" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition duration-200">
+                        <i class="fas fa-times mr-2"></i>Cancel
+                    </button>
+                    <button id="confirm-delete-all" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition duration-200">
+                        <i class="fas fa-trash-alt mr-2"></i>Delete All
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="share-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="text-center">
+                <i class="fas fa-share-alt text-5xl text-green-500 mb-4"></i>
+                <h2 class="text-2xl font-bold mb-4">Share Conversation</h2>
+                <p class="mb-6">Copy the link below to share this conversation:</p>
+                <div class="flex items-center justify-center mb-4">
+                    <input id="share-link" type="text" readonly class="w-full px-4 py-2 bg-gray-800 text-white rounded-l-lg focus:outline-none" value="">
+                    <button id="copy-share-link" class="px-4 py-2 bg-indigo-600 text-white rounded-r-lg hover:bg-indigo-700 transition duration-200">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                <button id="close-share-modal" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition duration-200">
+                    <i class="fas fa-times mr-2"></i>Close
+                </button>
+            </div>
+        </div>
+    </div>
+    <div id="image-generation-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="text-center">
+                <i class="fas fa-image text-5xl text-green-500 mb-4"></i>
+                <h2 class="text-2xl font-bold mb-4">Generate Image</h2>
+                <form id="image-generation-form">
+                    <input type="text" id="image-prompt" name="prompt" placeholder="Enter image prompt" class="w-full px-4 py-2 bg-gray-800 text-white rounded-lg mb-4" required>
+                    <div class="flex justify-center space-x-4">
+                        <button type="button" id="cancel-image-generation" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition duration-200">
+                            <i class="fas fa-times mr-2"></i>Cancel
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition duration-200">
+                            <i class="fas fa-check mr-2"></i>Generate
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div id="prompts-modal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden">
+        <div class="modal bg-gray-800 rounded-lg w-11/12 md:w-3/4 lg:w-1/2 p-6 fixed">
+          <div class="text-center">
+            <i class="fas fa-list-alt text-5xl text-green-500 mb-4"></i>
+            <h2 class="text-2xl font-bold mb-4 text-white">Useful Prompts</h2>
+            <button id="close-prompts-modal" class="absolute top-4 right-4 text-gray-400 hover:text-white transition duration-200">
+              <i class="fas fa-times text-2xl"></i>
+            </button>
+            <div id="prompts-container" class="space-y-4 max-h-96 overflow-y-auto text-white px-4">
+            </div>
+          </div>
+        </div>
+      </div>
+      <script>
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let cookie of cookies) {
+                    cookie = cookie.trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        const csrftoken = getCookie('csrftoken');
+        axios.defaults.headers.common['X-CSRFToken'] = csrftoken;
+
+        let currentConversationId = null;
+
+        function loadConversations() {
+            axios.get("{% url 'get_conversations' %}")
+                .then(response => {
+                    const conversations = response.data.conversations;
+                    const convList = document.getElementById('conversations');
+                    convList.innerHTML = '';
+                    conversations.forEach(conv => {
+                        const li = document.createElement('li');
+                        li.setAttribute('data-conversation-id', conv.id);
+                        li.classList.add('flex', 'items-center', 'justify-between', 'hover:bg-gray-700', 'px-4', 'py-2', 'cursor-pointer', 'transition', 'duration-200', 'rounded-lg');
+
+                        const convInfo = document.createElement('div');
+                        convInfo.classList.add('flex', 'items-center', 'w-full');
+                        convInfo.onclick = () => {
+                            currentConversationId = conv.id;
+                            loadMessages();
+                            highlightConversation(conv.id);
+                            focusMessageInput();
+                        };
+                        const icon = document.createElement('i');
+                        icon.classList.add('fas', 'fa-comments', 'mr-3', 'text-indigo-400');
+                        const span = document.createElement('span');
+                        span.textContent = conv.summary ? truncateSummary(conv.summary) : `Conversation ${conv.id}`;  // Use summary
+                        span.classList.add('flex-1');
+                        convInfo.appendChild(icon);
+                        convInfo.appendChild(span);
+
+                        const buttonsContainer = document.createElement('div');
+                        buttonsContainer.classList.add('flex', 'items-center');
+
+                        const shareButton = document.createElement('button');
+                        shareButton.classList.add('text-green-500', 'hover:text-green-600', 'transition', 'duration-200', 'mr-2');
+                        shareButton.innerHTML = '<i class="fas fa-share-alt"></i>';
+                        shareButton.onclick = (e) => {
+                            e.stopPropagation();
+                            showShareModal(conv.uuid);
+                        };
+
+                        const deleteButton = document.createElement('button');
+                        deleteButton.classList.add('text-red-500', 'hover:text-red-600', 'transition', 'duration-200');
+                        deleteButton.innerHTML = '<i class="fas fa-trash-alt"></i>';
+                        deleteButton.onclick = (e) => {
+                            e.stopPropagation();
+                            deleteConversation(conv.id);
+                        };
+
+                        buttonsContainer.appendChild(shareButton);
+                        buttonsContainer.appendChild(deleteButton);
+
+                        li.appendChild(convInfo);
+                        li.appendChild(buttonsContainer);
+                        convList.appendChild(li);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading conversations:', error);
+                });
+        }
+        function truncateSummary(summary, maxLength = 20) {
+            if (summary.length > maxLength) {
+                return summary.substring(0, maxLength - 3) + '...';
+            }
+            return summary;
+        }
+
+        function updateConversationSummary(conversationId, summary) {
+            const convListItems = document.querySelectorAll('#conversations li');
+            convListItems.forEach(li => {
+                if (li.getAttribute('data-conversation-id') == conversationId) {
+                    const span = li.querySelector('span');
+                    if (span) {
+                        span.textContent = truncateSummary(summary);
+                    }
+                }
+            });
+        }
+        function deleteConversation(conversationId) {
+            const modal = document.getElementById('delete-modal');
+            modal.style.display = 'block';
+            document.getElementById('cancel-delete').onclick = function() {
+                modal.style.display = 'none';
+            };
+            document.getElementById('confirm-delete').onclick = function() {
+                axios.post("{% url 'delete_conversation' %}", {
+                    conversation_id: conversationId
+                }).then(response => {
+                    if (response.data.status === 'success') {
+                        if (currentConversationId === conversationId) {
+                            currentConversationId = null;
+                            document.getElementById('chat-window').innerHTML = '';
+                            document.getElementById('conversation-title').textContent = 'Select a conversation or start a new one.';
+                        }
+                        loadConversations();
+                        modal.style.display = 'none';
+                    } else {
+                        alert('Error deleting conversation');
+                    }
+                }).catch(error => {
+                    alert('Error deleting conversation');
+                    console.error('Delete conversation error:', error);
+                });
+            };
+        }
+        function highlightConversation(id) {
+            const convListItems = document.getElementById('conversations').children;
+            for (let li of convListItems) {
+                li.classList.remove('bg-gray-700');
+                if (li.querySelector('div').onclick && li.querySelector('div').onclick.toString().includes(`currentConversationId = ${id}`)) {
+                    li.classList.add('bg-gray-700');
+                }
+            }
+        }
+
+        function loadMessages() {
+            if (!currentConversationId) return;
+            axios.get("{% url 'get_messages' %}", { params: { conversation_id: currentConversationId } })
+                .then(response => {
+                    const messages = response.data.messages;
+                    const chatWindow = document.getElementById('chat-window');
+                    chatWindow.innerHTML = '';
+                    messages.forEach(msg => {
+                        const div = document.createElement('div');
+                        div.classList.add('mb-4', 'flex');
+                        if (msg.sender === 'user') {
+                            div.classList.add('justify-end');
+                            if (msg.text) {
+                                div.innerHTML = `
+                                    <div class="max-w-md rounded-lg px-4 py-2 bg-indigo-600 text-white shadow-md chat-bubble">
+                                        ${sanitizeHTML(msg.text)}
+                                    </div>
+                                `;
+                            } else if (msg.image_url) {
+                                div.innerHTML = `
+                                    <div class="max-w-md rounded-lg px-4 py-2 bg-indigo-600 text-white shadow-md chat-bubble">
+                                        <img src="${msg.image_url}" alt="Image" class="rounded mt-2 max-w-full h-auto" />
+                                    </div>
+                                `;
+                            }
+                        } else {
+                            div.classList.add('justify-start');
+                            if (msg.text) {
+                                const parsedText = marked.parse(sanitizeMarkdown(msg.text));
+                                div.innerHTML = `
+                                    <div class="relative max-w-md rounded-lg px-4 py-2 bg-gray-700 text-white shadow-md chat-bubble">
+                                        ${parsedText}
+                                        <button class="copy-btn" title="Copy message">
+                                            <i class="fas fa-copy mr-1"></i> Copy
+                                        </button>
+                                    </div>
+                                `;
+                                const copyBtn = div.querySelector('.copy-btn');
+                                copyBtn.addEventListener('click', () => copyMessage(msg.text));
+                                // Apply syntax highlighting
+                                div.querySelectorAll('pre code').forEach((block) => {
+                                    hljs.highlightElement(block);
+                                });
+                            } else if (msg.image_url) {
+                                div.innerHTML = `
+                                    <div class="max-w-md rounded-lg px-4 py-2 bg-gray-700 text-white shadow-md chat-bubble">
+                                        <img src="${msg.image_url}" alt="Image" class="rounded mt-2 max-w-full h-auto" />
+                                    </div>
+                                `;
+                            }
+                        }
+                        chatWindow.appendChild(div);
+                    });
+                    chatWindow.scrollTop = chatWindow.scrollHeight;
+                    const summary = response.data.summary || `Conversation ${currentConversationId}`;
+                    document.getElementById('conversation-title').textContent = summary;
+                    focusMessageInput();
+                })
+                .catch(error => {
+                    console.error('Error loading messages:', error);
+                });
+        }
+
+        function copyMessage(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const notification = document.createElement('div');
+                notification.textContent = 'Copied!';
+                notification.classList.add('fixed', 'bottom-4', 'right-4', 'bg-green-500', 'text-white', 'px-4', 'py-2', 'rounded', 'shadow-lg', 'transition-opacity', 'duration-300');
+                document.body.appendChild(notification);
+                setTimeout(() => {
+                    notification.classList.add('opacity-0');
+                    setTimeout(() => notification.remove(), 250);
+                }, 500);
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+            });
+        }
+
+        function focusMessageInput() {
+            document.getElementById('message-input').focus();
+        }
+
+        function sanitizeHTML(str) {
+            const temp = document.createElement('div');
+            temp.textContent = str;
+            return temp.innerHTML;
+        }
+
+        function sanitizeMarkdown(markdown) {
+            return markdown.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        document.getElementById('message-form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const messageInput = document.getElementById('message-input');
+            const message = messageInput.value;
+            if (message.trim() === '') return;
+
+            const chatWindow = document.getElementById('chat-window');
+            const userDiv = document.createElement('div');
+            userDiv.classList.add('mb-4', 'flex', 'justify-end');
+            userDiv.innerHTML = `
+                <div class="max-w-md rounded-lg px-4 py-2 bg-indigo-600 text-white shadow-md chat-bubble">
+                    ${sanitizeHTML(message)}
+                </div>
+            `;
+            chatWindow.appendChild(userDiv);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            messageInput.value = '';
+            messageInput.disabled = true;
+
+            axios.post("{% url 'send_message' %}", {
+                message: message,
+                conversation_id: currentConversationId,
+            }).then(response => {
+                if (!currentConversationId) {
+                    currentConversationId = response.data.conversation_id;
+                    loadConversations();
+                }
+                const botDiv = document.createElement('div');
+                botDiv.classList.add('mb-4', 'flex', 'justify-start');
+                
+                const parsedResponse = marked.parse(sanitizeMarkdown(response.data.response));
+                
+                botDiv.innerHTML = `
+                    <div class="relative max-w-md rounded-lg px-4 py-2 bg-gray-700 text-white shadow-md chat-bubble">
+                        ${parsedResponse}
+                        <button class="copy-btn" title="Copy message">
+                            <i class="fas fa-copy mr-1"></i> Copy
+                        </button>
+                    </div>
+                `;
+                if (response.data.summary) {
+                    document.getElementById('conversation-title').textContent = response.data.summary;
+                    updateConversationSummary(response.data.conversation_id, response.data.summary);
+                }
+                const copyBtn = botDiv.querySelector('.copy-btn');
+                copyBtn.addEventListener('click', () => copyMessage(response.data.response));
+                chatWindow.appendChild(botDiv);
+                
+                botDiv.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+                
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+                messageInput.disabled = false;
+                document.querySelector('.credits').textContent = parseInt(document.querySelector('.credits').textContent) -1;
+                focusMessageInput();
+            })
+            .catch(error => {
+                console.error('Error sending message:', error);
+                alert('Failed to send message. Please try again.');
+            });
+        });
+
+        document.getElementById('new-chat').addEventListener('click', function () {
+            currentConversationId = null;
+            document.getElementById('chat-window').innerHTML = '';
+            document.getElementById('conversation-title').textContent = 'New Chat';
+            loadConversations();
+            focusMessageInput();
+        });
+
+        const userMenuButton = document.getElementById('user-menu-button');
+        const userMenu = document.getElementById('user-menu');
+
+        userMenuButton.addEventListener('click', function() {
+            userMenu.classList.toggle('show');
+        });
+
+        window.addEventListener('click', function(event) {
+            if (!userMenuButton.contains(event.target) && !userMenu.contains(event.target)) {
+                userMenu.classList.remove('show');
+            }
+        });
+        document.getElementById('delete-all-button').addEventListener('click', function () {
+            const modal = document.getElementById('delete-all-modal');
+            modal.style.display = 'block';
+
+            document.getElementById('cancel-delete-all').onclick = function() {
+                modal.style.display = 'none';
+            };
+
+            document.getElementById('confirm-delete-all').onclick = function() {
+                axios.post("{% url 'delete_all_conversations' %}")
+                    .then(response => {
+                        if (response.data.status === 'success') {
+                            currentConversationId = null;
+                            document.getElementById('chat-window').innerHTML = '';
+                            document.getElementById('conversation-title').textContent = 'Select a conversation or start a new one.';
+                            loadConversations();
+                            modal.style.display = 'none';
+                        } else {
+                            alert('Error deleting all conversations');
+                        }
+                    })
+                    .catch(error => {
+                        alert('Error deleting all conversations');
+                        console.error('Delete all conversations error:', error);
+                    });
+            };
+        });
+        document.getElementById('export-conversations').addEventListener('click', function (e) {
+            e.preventDefault();
+            
+            axios({
+                method: 'get',
+                url: '/ajax/export/', 
+                responseType: 'blob'
+            })
+            .then(function (response) {
+                const url = window.URL.createObjectURL(new Blob([response.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', 'conversations.json');
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+            })
+            .catch(function (error) {
+                console.error('Error exporting conversations:', error);
+                alert('You don\'t have any conversations.');
+            });
+        });
+        function showShareModal(conversationUuid) {
+            const modal = document.getElementById('share-modal');
+            modal.style.display = 'block';
+
+            const shareLinkInput = document.getElementById('share-link');
+            const baseUrl = window.location.origin;
+            const shareUrl = `${baseUrl}/conversations/${conversationUuid}/`;
+            shareLinkInput.value = shareUrl;
+
+            document.getElementById('copy-share-link').onclick = function() {
+                shareLinkInput.select();
+                document.execCommand('copy');
+                const notification = document.createElement('div');
+                notification.textContent = 'Link copied to clipboard!';
+                notification.classList.add('fixed', 'bottom-4', 'right-4', 'bg-green-500', 'text-white', 'px-4', 'py-2', 'rounded', 'shadow-lg', 'transition-opacity', 'duration-300');
+                document.body.appendChild(notification);
+                setTimeout(() => {
+                    notification.classList.add('opacity-0');
+                    setTimeout(() => notification.remove(), 250);
+                }, 500);
+            };
+
+            document.getElementById('close-share-modal').onclick = function() {
+                modal.style.display = 'none';
+            };
+        }
+
+        document.getElementById('share-modal').addEventListener('click', function(event) {
+            if (event.target === this) {
+                this.style.display = 'none';
+            }
+        });
+        document.getElementById('image-generation-button').addEventListener('click', function () {
+            document.getElementById('image-generation-modal').style.display = 'flex';
+        });
+
+        document.getElementById('cancel-image-generation').addEventListener('click', function () {
+            document.getElementById('image-generation-modal').style.display = 'none';
+        });
+
+        document.getElementById('image-generation-form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const prompt = document.getElementById('image-prompt').value;
+            if (prompt.trim() === '') return;
+
+            const modal = document.getElementById('image-generation-modal');
+            modal.style.display = 'none';
+
+            const chatWindow = document.getElementById('chat-window');
+
+            const userDiv = document.createElement('div');
+            userDiv.classList.add('mb-4', 'flex', 'justify-end');
+            userDiv.innerHTML = `
+                <div class="max-w-md rounded-lg px-4 py-2 bg-indigo-600 text-white shadow-md chat-bubble">
+                    ${sanitizeHTML(prompt)}
+                </div>
+            `;
+            chatWindow.appendChild(userDiv);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            document.getElementById('image-prompt').value = '';
+
+            axios.post("{% url 'generate_image' %}", {
+                prompt: prompt,
+                conversation_id: currentConversationId,
+            }).then(response => {
+                if (!currentConversationId) {
+                    currentConversationId = response.data.conversation_id;
+                    loadConversations();
+                }
+
+                const imageUrl = response.data.image_url;
+
+                const botDiv = document.createElement('div');
+                botDiv.classList.add('mb-4', 'flex', 'justify-start');
+                botDiv.innerHTML = `
+                    <div class="max-w-md rounded-lg px-4 py-2 bg-gray-700 text-white shadow-md chat-bubble">
+                        <img src="${imageUrl}" alt="Generated Image" class="rounded mt-2 max-w-full h-auto" />
+                    </div>
+                `;
+                chatWindow.appendChild(botDiv);
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+
+                document.querySelector('.credits').textContent = parseInt(document.querySelector('.credits').textContent) - 5;
+            })
+            .catch(error => {
+                console.error('Error generating image:', error);
+                alert(error.response.data.error || 'Failed to generate image. Please try again.');
+            });
+        });
+        function fetchPrompts() {
+                axios.get("{% url 'get_prompts' %}")
+                    .then(response => {
+                        const prompts = response.data.prompts;
+                        const container = document.getElementById('prompts-container');
+                        container.innerHTML = '';
+
+                        prompts.forEach(prompt => {
+                            const promptCard = document.createElement('div');
+                            promptCard.classList.add('bg-gray-700', 'p-4', 'rounded-lg', 'shadow-md');
+
+                            const promptTitle = document.createElement('h3');
+                            promptTitle.classList.add('text-xl', 'font-semibold', 'text-white', 'mb-2');
+                            promptTitle.textContent = prompt.name;
+
+                            const promptExplanation = document.createElement('p');
+                            promptExplanation.classList.add('text-gray-300', 'mb-4');
+                            promptExplanation.textContent = prompt.explanation;
+
+                            const copyButton = document.createElement('button');
+                            copyButton.classList.add('flex', 'items-center', 'px-3', 'py-2', 'bg-blue-600', 'text-white', 'rounded-lg', 'hover:bg-blue-700', 'focus:outline-none', 'transition', 'duration-200');
+                            copyButton.innerHTML = `<i class="fas fa-copy mr-2"></i> Copy Prompt`;
+                            copyButton.onclick = () => {
+                                copyToClipboard(prompt.content);
+                                showNotification('Prompt copied to clipboard!');
+                            };
+
+                            promptCard.appendChild(promptTitle);
+                            promptCard.appendChild(promptExplanation);
+                            promptCard.appendChild(copyButton);
+
+                            container.appendChild(promptCard);
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error fetching prompts:', error);
+                        alert('Failed to load prompts. Please try again later.');
+                    });
+            }
+
+                function copyToClipboard(text) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        console.log('Text copied to clipboard');
+                    }).catch(err => {
+                        console.error('Failed to copy text: ', err);
+                    });
+                }
+
+                function showNotification(message) {
+                    const notification = document.createElement('div');
+                    notification.textContent = message;
+                    notification.classList.add('fixed', 'bottom-4', 'right-4', 'bg-green-500', 'text-white', 'px-4', 'py-2', 'rounded', 'shadow-lg', 'opacity-0', 'transition-opacity', 'duration-300');
+                    document.body.appendChild(notification);
+                    setTimeout(() => {
+                        notification.classList.remove('opacity-0');
+                        notification.classList.add('opacity-100');
+                    }, 100);
+                    setTimeout(() => {
+                        notification.classList.remove('opacity-100');
+                        notification.classList.add('opacity-0');
+                        setTimeout(() => notification.remove(), 300);
+                    }, 2000);
+                }
+
+                document.getElementById('prompts-button').addEventListener('click', function () {
+                    fetchPrompts();
+                    document.getElementById('prompts-modal').classList.remove('hidden');
+                    document.getElementById('prompts-modal').classList.add('flex');
+                });
+
+                document.getElementById('close-prompts-modal').addEventListener('click', function () {
+                    document.getElementById('prompts-modal').classList.add('hidden');
+                    document.getElementById('prompts-modal').classList.remove('flex');
+                });
+
+                document.getElementById('prompts-modal').addEventListener('click', function (event) {
+                    if (event.target === this) {
+                        this.classList.add('hidden');
+                        this.classList.remove('flex');
+                    }
+                });
+        loadConversations();
+        focusMessageInput();
+    </script>
+    </body>
+</html>

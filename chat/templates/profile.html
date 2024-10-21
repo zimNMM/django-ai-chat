@@ -1,0 +1,358 @@
+<!-- templates/profile.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% load static %}
+    <title>User Profile - DjangoAI</title>
+    <meta charset="UTF-8">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://kit.fontawesome.com/38683e14e9.js" crossorigin="anonymous"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
+</head>
+<body class="bg-gray-950 text-gray-100">
+    <div class="min-h-screen flex items-center justify-center">
+        <div class="profile-box w-full max-w-lg p-8 rounded-lg">
+            <div class="flex items-center mb-6">
+                <i class="fas fa-user-circle text-4xl text-indigo-500 mr-4"></i>
+                <h2 class="text-2xl font-semibold">User Profile</h2>
+            </div>
+            <p class="mb-6 text-gray-300">Username: <span class="font-medium text-white">{{ user.username }}</span></p>
+            {% if messages %}
+            <ul class="mb-4">
+                {% for message in messages %}
+                <li class="text-{{ message.tags }}-500">{{ message }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-4">
+                    <label for="{{ form.old_password.id_for_label }}" class="block text-sm font-medium mb-1 text-gray-300">
+                        Old Password
+                    </label>
+                    <input
+                        type="password"
+                        name="{{ form.old_password.name }}"
+                        id="{{ form.old_password.id_for_label }}"
+                        class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring focus:ring-indigo-500 text-white"
+                        required
+                    >
+                    {% if form.old_password.errors %}
+                    <p class="text-red-500 text-sm mt-1">{{ form.old_password.errors }}</p>
+                    {% endif %}
+                </div>
+                <div class="mb-4">
+                    <label for="{{ form.new_password1.id_for_label }}" class="block text-sm font-medium mb-1 text-gray-300">
+                        New Password
+                    </label>
+                    <input
+                        type="password"
+                        name="{{ form.new_password1.name }}"
+                        id="{{ form.new_password1.id_for_label }}"
+                        class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring focus:ring-indigo-500 text-white"
+                        required
+                    >
+                    {% if form.new_password1.errors %}
+                    <p class="text-red-500 text-sm mt-1">{{ form.new_password1.errors }}</p>
+                    {% endif %}
+                </div>
+                <div class="mb-4">
+                    <label for="{{ form.new_password2.id_for_label }}" class="block text-sm font-medium mb-1 text-gray-300">
+                        Confirm New Password
+                    </label>
+                    <input
+                        type="password"
+                        name="{{ form.new_password2.name }}"
+                        id="{{ form.new_password2.id_for_label }}"
+                        class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring focus:ring-indigo-500 text-white"
+                        required
+                    >
+                    {% if form.new_password2.errors %}
+                    <p class="text-red-500 text-sm mt-1">{{ form.new_password2.errors }}</p>
+                    {% endif %}
+                </div>
+                <button type="submit"  name="change_password" class="w-full mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition duration-200">
+                    Change Password
+                </button>
+            </form>
+            <div class="mt-8">
+                <h3 class="text-xl font-semibold mb-4">Backend API Selection</h3>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-4">
+                        <label for="{{ backend_api_form.backend_api_choice.id_for_label }}" class="block text-sm font-medium mb-1 text-gray-300">
+                            {{ backend_api_form.backend_api_choice.label }}
+                        </label>
+                        {{ backend_api_form.backend_api_choice }}
+                    </div>
+                    <div class="mb-4" id="nebius-model-div">
+                        <label for="{{ backend_api_form.selected_model.id_for_label }}" class="block text-sm font-medium mb-1 text-gray-300">
+                            {{ backend_api_form.selected_model.label }}
+                        </label>
+                        {{ backend_api_form.selected_model }}
+                    </div>
+                    <div class="mb-4" id="oobabooga-character-div">
+                        <label for="{{ backend_api_form.selected_character.id_for_label }}" class="block text-sm font-medium mb-1 text-gray-300">
+                            {{ backend_api_form.selected_character.label }}
+                        </label>
+                        {{ backend_api_form.selected_character }}
+                    </div>
+                    <button type="submit" name="update_backend_api" class="w-full mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition duration-200">
+                        Update Backend API
+                    </button>
+                </form>
+            </div>
+            <div class="mt-8">
+                <h3 class="text-xl font-semibold mb-4">Two-Factor Authentication</h3>
+                {% if profile.otp_enabled %}
+                    <p class="mb-4 text-green-500">Two-Factor Authentication is enabled on your account.</p>
+                    <button id="disable-2fa-button" class="w-full mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition duration-200">
+                        Disable Two-Factor Authentication
+                    </button>
+                {% else %}
+                    <p class="mb-4 text-red-500">Two-Factor Authentication is not enabled on your account.</p>
+                    <button id="enable-2fa-button" class="w-full mt-4 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition duration-200">
+                        Enable Two-Factor Authentication
+                    </button>
+                {% endif %}
+            </div>
+                    <button id="delete-account-button" class="w-full mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition duration-200">
+                        Delete Account
+                    </button>
+
+                    <a href="{% url 'chat' %}" class="mt-6 inline-flex items-center text-indigo-400 hover:text-indigo-300 transition duration-200">
+                        <i class="fas fa-arrow-left mr-2"></i> Back to Chat
+                    </a>
+
+                </div>
+            </div>
+
+    <div id="delete-account-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="text-center">
+                <i class="fas fa-exclamation-triangle text-5xl text-yellow-500 mb-4"></i>
+                <h2 class="text-2xl font-bold mb-4">Delete Account</h2>
+                <p class="mb-6">Are you sure you want to delete your account? This action cannot be undone.</p>
+                <div class="flex justify-center space-x-4">
+                    <button id="cancel-delete-account" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition duration-200">
+                        <i class="fas fa-times mr-2"></i>Cancel
+                    </button>
+                    <button id="confirm-delete-account" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition duration-200">
+                        <i class="fas fa-trash-alt mr-2"></i>Delete Account
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="enable-2fa-modal" class="modal-overlay">
+        <div class="modal">
+        <div class="text-center">
+            <i class="fas fa-shield-alt text-5xl text-blue-500 mb-4"></i>
+            <h2 class="text-2xl font-bold mb-4">Enable Two-Factor Authentication</h2>
+            <p class="mb-4">Scan the QR code with your authenticator app and enter the OTP code below.</p>
+            <div id="qr-code-container" class="mb-4">
+            </div>
+            <form id="confirm-enable-2fa-form">
+            {% csrf_token %}
+            <div class="relative mb-4">
+                <i class="fas fa-key absolute left-3 top-3 text-gray-400"></i>
+                <input type="text" 
+                    name="otp_token" 
+                    placeholder="Enter OTP Code" 
+                    class="w-full px-3 py-2 pl-10 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring focus:ring-blue-500">
+            </div>
+            <div class="flex justify-center space-x-4">
+                <button type="button" 
+                        id="cancel-enable-2fa" 
+                        class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition duration-200">
+                <i class="fas fa-times mr-2"></i>Cancel
+                </button>
+                <button type="submit" 
+                        class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition duration-200">
+                <i class="fas fa-check mr-2"></i>Confirm
+                </button>
+            </div>
+            </form>
+        </div>
+        </div>
+    </div>   
+    <div id="disable-2fa-modal" class="modal-overlay">
+        <div class="modal">
+        <div class="text-center">
+            <i class="fas fa-shield-alt text-5xl text-red-500 mb-4"></i>
+            <h2 class="text-2xl font-bold mb-4">Disable Two-Factor Authentication</h2>
+            <p class="mb-4">Enter your OTP code to confirm disabling 2FA.</p>
+            <form id="confirm-disable-2fa-form">
+            {% csrf_token %}
+            <div class="relative mb-4">
+                <i class="fas fa-key absolute left-3 top-3 text-gray-400"></i>
+                <input type="text" 
+                    name="otp_token" 
+                    placeholder="Enter OTP Code" 
+                    class="w-full px-3 py-2 pl-10 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring focus:ring-blue-500">
+            </div>
+            <div class="flex justify-center space-x-4">
+                <button type="button" 
+                        id="cancel-disable-2fa" 
+                        class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition duration-200">
+                <i class="fas fa-times mr-2"></i>Cancel
+                </button>
+                <button type="submit" 
+                        class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition duration-200">
+                <i class="fas fa-shield-alt mr-2"></i>Disable 2FA
+                </button>
+            </div>
+            </form>
+        </div>
+        </div>
+    </div>
+    
+
+    <script>
+        function getCookie(name) {
+            var cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                var cookies = document.cookie.split(';');
+                for (var i = 0; i < cookies.length; i++) {
+                    var cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        var csrftoken = getCookie('csrftoken');
+
+        document.getElementById('delete-account-button').addEventListener('click', function() {
+            document.getElementById('delete-account-modal').style.display = 'flex';
+        });
+
+        document.getElementById('cancel-delete-account').addEventListener('click', function() {
+            document.getElementById('delete-account-modal').style.display = 'none';
+        });
+
+        document.getElementById('confirm-delete-account').addEventListener('click', function() {
+            fetch("{% url 'delete_user_account' %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrftoken,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({})
+            })
+            .then(response => {
+                if (response.redirected) {
+                    window.location.href = response.url;
+                } else if (response.ok) {
+                    window.location.href = "{% url 'login' %}";
+                } else {
+                    return response.json().then(data => {
+                        alert('Error: ' + data.error);
+                    });
+                }
+            })
+            .catch(error => {
+                alert('Error: ' + error);
+            });
+        });
+               $('#enable-2fa-button').click(function() {
+            $.ajax({
+                url: '',
+                method: 'POST',
+                data: {
+                    'enable_2fa': 'true',
+                    'csrfmiddlewaretoken': csrftoken
+                },
+                success: function(response) {
+                    if (response.status === 'qr_generated') {
+                        $('#qr-code-container').html('<img src="data:image/png;base64,' + response.qr_code_base64 + '" alt="QR Code" class="mx-auto">');
+                        $('#enable-2fa-modal').css('display', 'flex');
+                    }
+                }
+            });
+        });
+
+        $('#confirm-enable-2fa-form').submit(function(e) {
+            e.preventDefault();
+            $.ajax({
+                url: '',
+                method: 'POST',
+                data: {
+                    'confirm_enable_2fa': 'true',
+                    'otp_token': $(this).find('input[name="otp_token"]').val(),
+                    'csrfmiddlewaretoken': csrftoken
+                },
+                success: function(response) {
+                    if (response.status === 'success') {
+                        location.reload();
+                    } else {
+                        alert(response.message);
+                    }
+                }
+            });
+        });
+
+        $('#cancel-enable-2fa').click(function() {
+            $('#enable-2fa-modal').hide();
+        });
+
+        $('#disable-2fa-button').click(function() {
+            $('#disable-2fa-modal').css('display', 'flex');
+        });
+
+        $('#confirm-disable-2fa-form').submit(function(e) {
+            e.preventDefault();
+            $.ajax({
+                url: '',
+                method: 'POST',
+                data: {
+                    'confirm_disable_2fa': 'true',
+                    'otp_token': $(this).find('input[name="otp_token"]').val(),
+                    'csrfmiddlewaretoken': csrftoken
+                },
+                success: function(response) {
+                    if (response.status === 'success') {
+                        location.reload();
+                    } else {
+                        alert(response.message);
+                    }
+                }
+            });
+        });
+
+        $('#cancel-disable-2fa').click(function() {
+            $('#disable-2fa-modal').hide();
+        });
+        function toggleFields() {
+                var backendApiSelect = document.getElementById("id_backend_api_choice");
+                var selectedValue = backendApiSelect.value;
+                var nebiusModelDiv = document.getElementById("nebius-model-div");
+                var oobaboogaCharacterDiv = document.getElementById("oobabooga-character-div");
+
+                if (selectedValue === "nebius") {
+                    nebiusModelDiv.style.display = "block";
+                    oobaboogaCharacterDiv.style.display = "none";
+                } else if (selectedValue === "oobabooga") {
+                    nebiusModelDiv.style.display = "none";
+                    oobaboogaCharacterDiv.style.display = "block";
+                } else {
+                    nebiusModelDiv.style.display = "none";
+                    oobaboogaCharacterDiv.style.display = "none";
+                }
+            }
+
+            document.addEventListener("DOMContentLoaded", function() {
+                toggleFields();
+                var backendApiSelect = document.getElementById("id_backend_api_choice");
+                backendApiSelect.addEventListener("change", toggleFields);
+            });     
+    </script>
+</body>
+</html>
