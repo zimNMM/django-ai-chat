@@ -67,25 +67,25 @@
                         <div class="flex items-center">
                             <span class="text-sm text-gray-300">Ooba API:</span>
                             {% if ooba_api_status == 'Online' %}
-                                <span class="text-sm text-green-500 ml-1">{{ ooba_api_status }}</span>
+                                <i class="fas fa-circle text-green-500 ml-1"></i>
                             {% else %}
-                                <span class="text-sm text-red-500 ml-1">{{ ooba_api_status }}</span>
+                                <i class="fas fa-circle text-red-500 ml-1"></i>
                             {% endif %}
                         </div>
                         <div class="flex items-center">
                             <span class="text-sm text-gray-300">Ollama API:</span>
                             {% if ollama_api_status == 'Online' %}
-                                <span class="text-sm text-green-500 ml-1">{{ ollama_api_status }}</span>
+                                <i class="fas fa-circle text-green-500 ml-1"></i>
                             {% else %}
-                                <span class="text-sm text-red-500 ml-1">{{ ollama_api_status }}</span>
+                                <i class="fas fa-circle text-red-500 ml-1"></i>
                             {% endif %}
                         </div>
                         <div class="flex items-center">
                             <span class="text-sm text-gray-300">Image API:</span>
                             {% if img_api_status == 'Online' %}
-                                <span class="text-sm text-green-500 ml-1">{{ img_api_status }}</span>
+                                <i class="fas fa-circle text-green-500 ml-1"></i>
                             {% else %}
-                                <span class="text-sm text-red-500 ml-1">{{ img_api_status }}</span>
+                                <i class="fas fa-circle text-red-500 ml-1"></i>
                             {% endif %}
                         </div>
                     </div>
@@ -418,9 +418,10 @@
                                             <i class="fas fa-copy mr-1"></i> Copy
                                         </button>
                                         ${index === messages.length - 1 && msg.sender !== 'user' ? `
-                                            <button class="regenerate-btn mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition duration-200">
-                                                <i class="fas fa-redo mr-1"></i> Regenerate
-                                            </button>
+                                        <button class="regenerate-btn flex items-center justify-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-lg hover:from-indigo-700 hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+                                            <i class="fas fa-sync-alt"></i>
+                                            <span>Regenerate Response</span>
+                                        </button>
                                         ` : ''}
                                     </div>
                                 `;
@@ -482,12 +483,19 @@
                         <button class="copy-btn" title="Copy message">
                             <i class="fas fa-copy mr-1"></i> Copy
                         </button>
-                        <button class="regenerate-btn mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition duration-200">
-                            <i class="fas fa-redo mr-1"></i> Regenerate
+                        <button class="regenerate-btn flex items-center justify-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-lg hover:from-indigo-700 hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+                            <i class="fas fa-sync-alt"></i>
+                            <span>Regenerate Response</span>
                         </button>
                     </div>
                 `;
-
+                createReactionButtons({
+                    sender: 'bot',
+                    text: response.data.response,
+                    id: response.data.message_id,
+                    reaction_counts: { up: 0, down: 0 },
+                    user_reaction: null
+                }, botDiv);
                 const copyBtn = botDiv.querySelector('.copy-btn');
                 copyBtn.addEventListener('click', () => copyMessage(response.data.response));
 
@@ -597,7 +605,6 @@
 
             messageInput.value = '';
             messageInput.disabled = true;
-
             axios.post("{% url 'send_message' %}", {
                 message: message,
                 conversation_id: currentConversationId,
@@ -617,11 +624,19 @@
                         <button class="copy-btn" title="Copy message">
                             <i class="fas fa-copy mr-1"></i> Copy
                         </button>
-                        <button class="regenerate-btn mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition duration-200">
-                            <i class="fas fa-redo mr-1"></i> Regenerate
+                        <button class="regenerate-btn flex items-center justify-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-lg hover:from-indigo-700 hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+                        <i class="fas fa-sync-alt"></i>
+                        <span>Regenerate Response</span>
                         </button>
                     </div>
                 `;
+                createReactionButtons({
+                    sender: 'bot',
+                    text: response.data.response,
+                    id: response.data.message_id,
+                    reaction_counts: { up: 0, down: 0 },
+                    user_reaction: null
+                }, botDiv);
                 if (response.data.summary) {
                     document.getElementById('conversation-title').textContent = response.data.summary;
                     updateConversationSummary(response.data.conversation_id, response.data.summary);
@@ -772,6 +787,10 @@
 
             const chatWindow = document.getElementById('chat-window');
 
+            const previousRegenerateBtn = chatWindow.querySelector('.regenerate-btn');
+            if (previousRegenerateBtn) {
+                previousRegenerateBtn.remove();
+            }
             const userDiv = document.createElement('div');
             userDiv.classList.add('mb-4', 'flex', 'justify-end');
             userDiv.innerHTML = `
@@ -896,81 +915,104 @@
                 function createReactionButtons(message, msgDiv) {
                 if (message.sender === 'bot' && message.text) {
                     const reactionContainer = document.createElement('div');
-                    reactionContainer.classList.add('flex', 'items-center', 'mt-2', 'space-x-2');
+                    reactionContainer.classList.add('mt-6', 'pt-4', 'border-t', 'border-gray-700');
                     
-                    const reactions = [
-                        { type: 'up', icon: 'fa-thumbs-up', label: 'Helpful' },
-                        { type: 'down', icon: 'fa-thumbs-down', label: 'Not Helpful' }
-                    ];
+                    // Add decorative line with gradient
+                    const decorativeLine = `
+                        <div class="mb-2 flex items-center">
+                            <div class="flex-grow h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent"></div>
+                            <div class="mx-2">
+                                <i class="fas fa-robot text-indigo-400"></i>
+                            </div>
+                            <div class="flex-grow h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent"></div>
+                        </div>
+                    `;
                     
-                    reactions.forEach(reaction => {
-                        const button = document.createElement('button');
-                        button.classList.add(
-                            'reaction-btn',
-                            'flex',
-                            'items-center',
-                            'space-x-1',
-                            'px-2',
-                            'py-1',
-                            'rounded-md',
-                            'text-sm',
-                            'transition-colors',
-                            'duration-200'
-                        );
-                        
-                        if (message.user_reaction === reaction.type) {
-                            button.classList.add('bg-indigo-600', 'text-white');
-                        } else {
-                            button.classList.add('bg-gray-700', 'hover:bg-gray-600');
-                        }
-                        
-                        const count = message.reaction_counts ? message.reaction_counts[reaction.type] || 0 : 0;
-                        
-                        button.innerHTML = `
-                            <i class="fas ${reaction.icon}"></i>
-                            <span class="reaction-count">${count}</span>
-                            <span class="ml-1">${reaction.label}</span>
-                        `;
-                        
-                        button.onclick = async (e) => {
+                    reactionContainer.innerHTML = `
+                        ${decorativeLine}
+                        <div class="flex items-center space-x-3">
+                            <button class="reaction-btn flex-1 flex items-center justify-center space-x-2 py-2.5 rounded-lg transition-all duration-200 
+                                ${message.user_reaction === 'up' 
+                                    ? 'bg-green-600 text-white' 
+                                    : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}"
+                                    data-reaction="up">
+                                <i class="fas fa-thumbs-up"></i>
+                                <span>Helpful</span>
+                                <span class="bg-opacity-20 bg-white px-2 py-0.5 rounded-full text-sm">
+                                    ${message.reaction_counts?.up || 0}
+                                </span>
+                            </button>
+                            
+                            <button class="reaction-btn flex-1 flex items-center justify-center space-x-2 py-2.5 rounded-lg transition-all duration-200
+                                ${message.user_reaction === 'down' 
+                                    ? 'bg-red-600 text-white' 
+                                    : 'bg-gray-700 hover:bg-gray-600 text-gray-300'}"
+                                    data-reaction="down">
+                                <i class="fas fa-thumbs-down"></i>
+                                <span>Not Helpful</span>
+                                <span class="bg-opacity-20 bg-white px-2 py-0.5 rounded-full text-sm">
+                                    ${message.reaction_counts?.down || 0}
+                                </span>
+                            </button>
+                        </div>
+                    `;
+
+                    // Add click handlers for the reaction buttons
+                    reactionContainer.querySelectorAll('.reaction-btn').forEach(button => {
+                        button.addEventListener('click', async (e) => {
                             e.stopPropagation();
+                            const reactionType = button.dataset.reaction;
+                            const isUp = reactionType === 'up';
+                            
+                            // Immediately update UI
+                            const otherButton = button.parentElement.querySelector(`.reaction-btn[data-reaction="${isUp ? 'down' : 'up'}"]`);
+                            
+                            // Remove active state from other button
+                            otherButton.classList.remove(isUp ? 'bg-red-600' : 'bg-green-600', 'text-white');
+                            otherButton.classList.add('bg-gray-700', 'hover:bg-gray-600', 'text-gray-300');
+                            
+                            // Toggle current button
+                            if (button.classList.contains(isUp ? 'bg-green-600' : 'bg-red-600')) {
+                                button.classList.remove(isUp ? 'bg-green-600' : 'bg-red-600', 'text-white');
+                                button.classList.add('bg-gray-700', 'hover:bg-gray-600', 'text-gray-300');
+                            } else {
+                                button.classList.remove('bg-gray-700', 'hover:bg-gray-600', 'text-gray-300');
+                                button.classList.add(isUp ? 'bg-green-600' : 'bg-red-600', 'text-white');
+                            }
+                            
                             try {
-                                console.log('Sending reaction:', message.id, reaction.type);
                                 const response = await axios.post("{% url 'toggle_reaction' %}", {
                                     message_id: message.id,
-                                    reaction: reaction.type
+                                    reaction: reactionType
                                 });
                                 
                                 if (response.data.status === 'success') {
                                     const counts = response.data.reaction_counts;
-                                    const allButtons = reactionContainer.querySelectorAll('.reaction-btn');
                                     
-                                    allButtons.forEach(btn => {
-                                        btn.classList.remove('bg-indigo-600', 'text-white');
-                                        btn.classList.add('bg-gray-700');
+                                    // Update reaction counts
+                                    reactionContainer.querySelectorAll('.reaction-btn').forEach(btn => {
+                                        const isUpBtn = btn.dataset.reaction === 'up';
+                                        const count = isUpBtn ? counts.up : counts.down;
+                                        const countSpan = btn.querySelector('.rounded-full');
+                                        countSpan.textContent = count;
                                     });
                                     
-                                    reactionContainer.querySelectorAll('.reaction-count').forEach((countSpan, index) => {
-                                        const reactionType = reactions[index].type;
-                                        countSpan.textContent = counts[reactionType] || 0;
-                                    });
-                                    
-                                    if (counts[reaction.type] > count) {
-                                        button.classList.remove('bg-gray-700');
-                                        button.classList.add('bg-indigo-600', 'text-white');
-                                    }
-                                    
-                                    showNotification(`Reaction ${counts[reaction.type] > count ? 'added' : 'removed'}!`, 'success');
+                                    showNotification(`Reaction ${counts[reactionType] > (message.reaction_counts[reactionType] || 0) ? 'added' : 'removed'}!`, 'success');
                                 }
                             } catch (error) {
                                 console.error('Error toggling reaction:', error);
                                 showNotification('Failed to update reaction', 'error');
+                                
+                                // Revert UI changes on error
+                                button.classList.toggle('bg-gray-700');
+                                button.classList.toggle('hover:bg-gray-600');
+                                button.classList.toggle('text-gray-300');
+                                button.classList.toggle(isUp ? 'bg-green-600' : 'bg-red-600');
+                                button.classList.toggle('text-white');
                             }
-                        };
-                        
-                        reactionContainer.appendChild(button);
+                        });
                     });
-                    
+
                     const messageContent = msgDiv.querySelector('.chat-bubble');
                     const regenerateBtn = messageContent.querySelector('.regenerate-btn');
                     if (regenerateBtn) {
@@ -980,6 +1022,7 @@
                     }
                 }
             }
+
             document.addEventListener('DOMContentLoaded', function() {
                 const searchInput = document.getElementById('searchInput');
                 const searchResults = document.getElementById('searchResults');

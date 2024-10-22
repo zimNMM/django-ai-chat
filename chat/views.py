@@ -83,10 +83,11 @@ def sync_ollama_models():
     try:
         response = requests.get(f"{ollama_url}/api/tags")
         if response.status_code == 200:
-            data = response.json()            
-            for model_data in data.get('models', []):
-                name = model_data['name']
+            data = response.json()
+            api_models = {model['name'] for model in data.get('models', [])}
+            for name in api_models:
                 OllamaModel.objects.get_or_create(name=name)
+            OllamaModel.objects.exclude(name__in=api_models).delete()           
             return True
         else:
             print(f"Error syncing Ollama models: {response.text}")
@@ -192,9 +193,9 @@ def send_to_oobabooga(conversation, credits_object):
         'mode': 'chat',
         'character': selected_character,
         "temperature": 0.7,
-        "max_tokens": 150,
-        "top_p": 0.75,
-        "frequency_penalty": 0.45,
+        "max_tokens": 250,
+        "top_p": 0.85,
+        "frequency_penalty": 0.35,
     }
     try:
         response = requests.post(ooba_url, headers=headers, json=data)
@@ -223,7 +224,7 @@ def generate_summary(user_message, assistant_message):
         str: Summary of the conversation.
     """
     openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    prompt = f"Summarize the following conversation between a user and an assistant in one sentence:\n\nUser: {user_message}\nAssistant: {assistant_message}\n\nSummary:"
+    prompt = f"Summarize the following conversation between a user and an assistant in 10 words maximum:\n\nUser: {user_message}\nAssistant: {assistant_message}\n\nSummary:"
     try:
         completion = openai_client.chat.completions.create(
             model="gpt-4o-mini",
@@ -342,36 +343,40 @@ def send_message(request):
         if request.method == 'POST':
             try:
                 data = json.loads(request.body)
-            except json.JSONDecodeError:
-                return JsonResponse({'error': 'Invalid JSON'}, status=400)
+                user_message = data.get('message')
+                conversation_id = data.get('conversation_id')
 
-            user_message = data.get('message')
-            conversation_id = data.get('conversation_id')
+                if not user_message:
+                    return JsonResponse({'error': 'Message cannot be empty'}, status=400)
 
-            if not user_message:
-                return JsonResponse({'error': 'Message cannot be empty'}, status=400)
+                if conversation_id and conversation_id != 'null':
+                    conversation = get_object_or_404(Conversation, id=conversation_id, user=request.user)
+                else:
+                    conversation = Conversation.objects.create(user=request.user)
 
-            if conversation_id and conversation_id != 'null':
-                conversation = get_object_or_404(Conversation, id=conversation_id, user=request.user)
-            else:
-                conversation = Conversation.objects.create(user=request.user)
+                Message.objects.create(conversation=conversation, sender='user', text=user_message)
+                backend_api = request.user.profile.backend_api_choice
+                response_text = send_to_backend(conversation, credits, backend_api)
 
-            Message.objects.create(conversation=conversation, sender='user', text=user_message)
-            backend_api = request.user.profile.backend_api_choice
-            response_text = send_to_backend(conversation, credits, backend_api)
+                bot_message = Message.objects.create(conversation=conversation, sender='bot', text=response_text)
 
-            Message.objects.create(conversation=conversation, sender='bot', text=response_text)
+                if conversation.messages.count() == 2:
+                    summary = generate_summary(user_message, response_text)
+                    conversation.summary = summary
+                    conversation.save()
+                else:
+                    summary = conversation.summary or ''
 
-            if conversation.messages.count() == 2:
-                summary = generate_summary(user_message, response_text)
-                conversation.summary = summary
-                conversation.save()
-            else:
-                summary = conversation.summary or ''
-
-            return JsonResponse({'response': response_text, 'conversation_id': conversation.id, 'summary': summary})
-
-        return JsonResponse({'error': 'Invalid request'}, status=400)
+                return JsonResponse({
+                    'response': response_text, 
+                    'conversation_id': conversation.id, 
+                    'summary': summary,
+                    'message_id': bot_message.id,
+                    'reaction_counts': bot_message.reaction_counts,
+                    'user_reaction': None
+                })
+            except Exception as e:
+                return JsonResponse({'error': 'Invalid request'}, status=400)
 
 @login_required
 def get_messages(request):
@@ -759,7 +764,12 @@ def regenerate_response(request):
             backend_api = request.user.profile.backend_api_choice
             response_text = send_to_backend(conversation, credits, backend_api)
             new_bot_message = Message.objects.create(conversation=conversation, sender='bot', text=response_text)
-            return JsonResponse({'response': response_text})
+            return JsonResponse({
+                'response': response_text,
+                'message_id': new_bot_message.id,
+                'reaction_counts': new_bot_message.reaction_counts,
+                'user_reaction': None
+            })
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
 

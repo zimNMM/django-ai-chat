@@ -205,43 +205,27 @@ body {
 }
 .regenerate-btn {
     position: absolute;
-    bottom: -2rem;
+    bottom: -2.5rem;
     left: 0;
-    background-color: rgba(37, 99, 235, 0.8);
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 9999px;
     font-size: 0.875rem;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.regenerate-btn:hover {
-    background-color: rgba(30, 64, 175, 1);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
-}
-
-.regenerate-btn:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    font-weight: 500;
 }
 
 .regenerate-btn i {
-    transition: transform 0.3s ease;
+    transition: transform 0.5s ease;
 }
 
 .regenerate-btn:hover i {
     transform: rotate(180deg);
 }
 
+.regenerate-btn:active {
+    transform: scale(0.98) translateY(0);
+}
+
 .chat-bubble {
     position: relative;
-    padding-bottom: 2.5rem;
+    padding-bottom: 3rem;
 }
 .reaction-btn {
     opacity: 0;
