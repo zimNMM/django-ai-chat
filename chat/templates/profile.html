@@ -102,6 +102,12 @@
                         </label>
                         {{ backend_api_form.selected_character }}
                     </div>
+                    <div class="mb-4" id="ollama-model-div">
+                        <label for="{{ backend_api_form.selected_ollama_model.id_for_label }}" class="block text-sm font-medium mb-1 text-gray-300">
+                            {{ backend_api_form.selected_ollama_model.label }}
+                        </label>
+                        {{ backend_api_form.selected_ollama_model }}
+                    </div>
                     <button type="submit" name="update_backend_api" class="w-full mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition duration-200">
                         Update Backend API
                     </button>
@@ -331,22 +337,26 @@
             $('#disable-2fa-modal').hide();
         });
         function toggleFields() {
-                var backendApiSelect = document.getElementById("id_backend_api_choice");
-                var selectedValue = backendApiSelect.value;
-                var nebiusModelDiv = document.getElementById("nebius-model-div");
-                var oobaboogaCharacterDiv = document.getElementById("oobabooga-character-div");
+            var backendApiSelect = document.getElementById("id_backend_api_choice");
+            var selectedValue = backendApiSelect.value;
+            var nebiusModelDiv = document.getElementById("nebius-model-div");
+            var oobaboogaCharacterDiv = document.getElementById("oobabooga-character-div");
+            var ollamaModelDiv = document.getElementById("ollama-model-div");
 
-                if (selectedValue === "nebius") {
-                    nebiusModelDiv.style.display = "block";
-                    oobaboogaCharacterDiv.style.display = "none";
-                } else if (selectedValue === "oobabooga") {
-                    nebiusModelDiv.style.display = "none";
-                    oobaboogaCharacterDiv.style.display = "block";
-                } else {
-                    nebiusModelDiv.style.display = "none";
-                    oobaboogaCharacterDiv.style.display = "none";
-                }
+            // Hide all divs first
+            nebiusModelDiv.style.display = "none";
+            oobaboogaCharacterDiv.style.display = "none";
+            ollamaModelDiv.style.display = "none";
+
+            // Show the appropriate div based on selection
+            if (selectedValue === "nebius") {
+                nebiusModelDiv.style.display = "block";
+            } else if (selectedValue === "oobabooga") {
+                oobaboogaCharacterDiv.style.display = "block";
+            } else if (selectedValue === "ollama") {
+                ollamaModelDiv.style.display = "block";
             }
+        }
 
             document.addEventListener("DOMContentLoaded", function() {
                 toggleFields();

@@ -37,7 +37,12 @@ class NebiusModel(models.Model):
 
     def __str__(self):
         return self.name
-
+    
+class OllamaModel(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    
+    def __str__(self):
+        return self.name
 class OobaboogaCharacter(models.Model):
     name = models.CharField(max_length=255, unique=True)
 
@@ -51,11 +56,13 @@ class Profile(models.Model):
     BACKEND_API_CHOICES = [
         ('oobabooga', 'Oobabooga'),
         ('nebius', 'Nebius'),
+        ('ollama', 'Ollama'),
     ]
     
     backend_api_choice = models.CharField(max_length=20, choices=BACKEND_API_CHOICES, default='oobabooga')
     selected_model = models.ForeignKey(NebiusModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='profiles')
     selected_character = models.ForeignKey(OobaboogaCharacter, on_delete=models.SET_NULL, null=True, blank=True, related_name='profiles')
+    selected_ollama_model = models.ForeignKey(OllamaModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='ollama_profiles')
     
     def __str__(self):
         return f'Profile for {self.user.username}'

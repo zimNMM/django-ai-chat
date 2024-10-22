@@ -73,6 +73,14 @@
                             {% endif %}
                         </div>
                         <div class="flex items-center">
+                            <span class="text-sm text-gray-300">Ollama API:</span>
+                            {% if ollama_api_status == 'Online' %}
+                                <span class="text-sm text-green-500 ml-1">{{ ollama_api_status }}</span>
+                            {% else %}
+                                <span class="text-sm text-red-500 ml-1">{{ ollama_api_status }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="flex items-center">
                             <span class="text-sm text-gray-300">Image API:</span>
                             {% if img_api_status == 'Online' %}
                                 <span class="text-sm text-green-500 ml-1">{{ img_api_status }}</span>
@@ -268,7 +276,7 @@
                         const icon = document.createElement('i');
                         icon.classList.add('fas', 'fa-comments', 'mr-3', 'text-indigo-400');
                         const span = document.createElement('span');
-                        span.textContent = conv.summary ? truncateSummary(conv.summary) : `Conversation ${conv.id}`;  // Use summary
+                        span.textContent = conv.summary ? truncateSummary(conv.summary) : `Conversation ${conv.id}`;  
                         span.classList.add('flex-1');
                         convInfo.appendChild(icon);
                         convInfo.appendChild(span);

@@ -4,7 +4,7 @@ from django import forms
 from django.contrib.auth.forms import PasswordChangeForm, AuthenticationForm
 from django.contrib.auth import authenticate
 
-from .models import Profile, NebiusModel, OobaboogaCharacter
+from .models import Profile, NebiusModel, OobaboogaCharacter, OllamaModel
 
 import pyotp
 
@@ -12,7 +12,7 @@ import pyotp
 class BackendAPIChoiceForm(forms.ModelForm):
     class Meta:
         model = Profile
-        fields = ['backend_api_choice', 'selected_model', 'selected_character']
+        fields = ['backend_api_choice', 'selected_model', 'selected_character', 'selected_ollama_model']
         widgets = {
             'backend_api_choice': forms.Select(attrs={
                 'class': 'w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring focus:ring-blue-500',
@@ -21,6 +21,9 @@ class BackendAPIChoiceForm(forms.ModelForm):
                 'class': 'w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring focus:ring-blue-500',
             }),
             'selected_character': forms.Select(attrs={
+                'class': 'w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring focus:ring-blue-500',
+            }),
+            'selected_ollama_model': forms.Select(attrs={
                 'class': 'w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring focus:ring-blue-500',
             }),
         }
@@ -32,14 +35,21 @@ class BackendAPIChoiceForm(forms.ModelForm):
             self.fields['selected_model'].queryset = NebiusModel.objects.all()
             self.fields['selected_model'].required = True
             self.fields['selected_character'].widget = forms.HiddenInput()
+            self.fields['selected_ollama_model'].widget = forms.HiddenInput()
         elif backend_api == 'oobabooga':
             self.fields['selected_character'].queryset = OobaboogaCharacter.objects.all()
             self.fields['selected_character'].required = True
             self.fields['selected_model'].widget = forms.HiddenInput()
-            
+            self.fields['selected_ollama_model'].widget = forms.HiddenInput()
+        elif backend_api == 'ollama':
+            self.fields['selected_ollama_model'].queryset = OllamaModel.objects.all()
+            self.fields['selected_ollama_model'].required = True
+            self.fields['selected_model'].widget = forms.HiddenInput()
+            self.fields['selected_character'].widget = forms.HiddenInput()
         else:
             self.fields['selected_model'].widget = forms.HiddenInput()
             self.fields['selected_character'].widget = forms.HiddenInput()
+            self.fields['selected_ollama_model'].widget = forms.HiddenInput()
 
 class CustomPasswordChangeForm(PasswordChangeForm):
     old_password = forms.CharField(

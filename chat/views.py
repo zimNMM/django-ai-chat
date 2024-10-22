@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from django.core.files.base import ContentFile
 from django.db.models import Q
 
-from .models import Conversation, Message, Credits, Prompt, MessageReaction
+from .models import Conversation, Message, Credits, Prompt, MessageReaction, OllamaModel
 from .forms import CustomPasswordChangeForm, OTPEnableForm, CustomAuthenticationForm, BackendAPIChoiceForm
 
 import os
@@ -30,6 +30,7 @@ load_dotenv()
 
 ooba_url =  os.getenv("OOBABOOGA_URL")
 img_url = os.getenv("STABLEDIFFUSION_URL")
+ollama_url = os.getenv("OLLAMA_URL")
 
 # ==============================================================================
 # Section 1: Utility Functions
@@ -58,6 +59,9 @@ def check_api_status(url):
 def check_ooba_api_status():
     """Checks the status of the Oobabooga API."""
     return check_api_status(ooba_url)
+def check_ollama_api_status():
+    """Checks the status of the Ollama API."""
+    return check_api_status(ollama_url)
 def check_img_api_status():
     """Checks the status of the StableDiffusion API."""
     return check_api_status(img_url)
@@ -69,6 +73,63 @@ def check_img_api_status():
 # ==============================================================================
 
 
+def sync_ollama_models():
+    """
+    Synchronizes Ollama models from the API with the database.
+
+    Returns:
+        bool: True if successful, False otherwise.
+    """
+    try:
+        response = requests.get(f"{ollama_url}/api/tags")
+        if response.status_code == 200:
+            data = response.json()            
+            for model_data in data.get('models', []):
+                name = model_data['name']
+                OllamaModel.objects.get_or_create(name=name)
+            return True
+        else:
+            print(f"Error syncing Ollama models: {response.text}")
+            return False
+    except Exception as e:
+        print(f"Error syncing Ollama models: {e}")
+        return False
+
+def send_to_ollama(conversation, credits_object):
+    """
+    Sends conversation to the Ollama API and retrieves the assistant's response.
+
+    Args:
+        conversation (Conversation): The conversation object.
+        credits_object (Credits): The user's credits object.
+
+    Returns:
+        str: Assistant's response or an error message.
+    """
+    ollama_client = OpenAI(base_url = 'http://localhost:11434/v1',api_key='ollama')
+    messages = conversation.messages.order_by('timestamp')
+    history = []
+
+    for msg in messages:
+        role = 'user' if msg.sender == 'user' else 'assistant'
+        history.append({'role': role, 'content': msg.text})
+    print (history)
+
+    profile = conversation.user.profile
+    selected_model = profile.selected_ollama_model.name if profile.selected_ollama_model else None 
+    if not selected_model:
+        return 'Error: No Ollama model selected.'
+    try:
+        response = ollama_client.chat.completions.create(
+            model=selected_model,
+            messages=history,
+        )
+        assistant_message = response.choices[0].message.content.strip()
+        credits_object.credits -= 1
+        credits_object.save()
+        return assistant_message
+    except Exception as e:
+        return f'Error: {str(e)}'
 def send_to_nebius(conversation, credits_object):
     """
     Sends conversation to the Nebius API and retrieves the assistant's response.
@@ -234,6 +295,8 @@ def send_to_backend(conversation, credits_object, backend_api):
         return send_to_oobabooga(conversation, credits_object)
     elif backend_api == 'nebius':
         return send_to_nebius(conversation, credits_object)
+    elif backend_api == 'ollama':
+        return send_to_ollama(conversation, credits_object)
     else:
         return 'Error: Unsupported backend API.'
 # ==============================================================================
@@ -258,7 +321,8 @@ def chat_view(request):
     initials = user.username[:2].upper()
     ooba_api_status = check_ooba_api_status()
     img_api_status = check_img_api_status()
-    return render(request, 'chat.html', {'conversations': conversations,'credits': credits,'initials': initials,'ooba_api_status': ooba_api_status,'img_api_status': img_api_status})
+    ollama_api_status = check_ollama_api_status
+    return render(request, 'chat.html', {'conversations': conversations,'credits': credits,'initials': initials,'ooba_api_status': ooba_api_status,'ollama_api_status':ollama_api_status,'img_api_status': img_api_status})
 
 @login_required
 def send_message(request):
@@ -596,6 +660,7 @@ def profile_view(request):
     """
     profile = request.user.profile
     qr_code_base64 = None
+    sync_ollama_models()
     if request.method == 'POST':
         form = CustomPasswordChangeForm(request.user, request.POST)
         otp_form = OTPEnableForm()
