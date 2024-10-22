@@ -179,3 +179,179 @@ body {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
                 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
+.copy-code-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background-color: rgba(59, 130, 246, 0.7);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    transition: background-color 0.2s, opacity 0.2s;
+    opacity: 0;
+}
+
+.chat-bubble pre {
+    position: relative;
+}
+
+.chat-bubble pre:hover .copy-code-btn {
+    opacity: 1;
+}
+
+.copy-code-btn:hover {
+    background-color: rgba(59, 130, 246, 1);
+}
+.regenerate-btn {
+    position: absolute;
+    bottom: -2rem;
+    left: 0;
+    background-color: rgba(37, 99, 235, 0.8);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.regenerate-btn:hover {
+    background-color: rgba(30, 64, 175, 1);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+}
+
+.regenerate-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.regenerate-btn i {
+    transition: transform 0.3s ease;
+}
+
+.regenerate-btn:hover i {
+    transform: rotate(180deg);
+}
+
+.chat-bubble {
+    position: relative;
+    padding-bottom: 2.5rem;
+}
+.reaction-btn {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.chat-bubble:hover .reaction-btn {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.reaction-btn.active {
+    background-color: rgb(79, 70, 229) !important;
+    color: white;
+}
+.search-container {
+    position: relative;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.75rem 1rem 0.75rem 2.5rem;
+    background-color: #2D3748;
+    border: 1px solid #4A5568;
+    border-radius: 0.5rem;
+    color: white;
+    font-size: 0.875rem;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #4C51BF;
+    box-shadow: 0 0 0 2px rgba(76, 81, 191, 0.2);
+}
+
+.search-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #A0AEC0;
+}
+
+.search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: #1A202C;
+    border: 1px solid #4A5568;
+    border-radius: 0.5rem;
+    margin-top: 0.5rem;
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 50;
+    display: none;
+}
+
+.search-results.show {
+    display: block;
+}
+
+.search-result-item {
+    padding: 1rem;
+    border-bottom: 1px solid #2D3748;
+    cursor: pointer;
+}
+
+.search-result-item:hover {
+    background-color: #2D3748;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-highlight {
+    background-color: rgba(76, 81, 191, 0.2);
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+}
+
+.search-meta {
+    font-size: 0.75rem;
+    color: #A0AEC0;
+    margin-top: 0.25rem;
+}
+
+.search-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+    color: #A0AEC0;
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+

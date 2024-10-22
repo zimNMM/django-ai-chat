@@ -26,6 +26,21 @@
                 <i class="fas fa-robot text-3xl text-white mr-3"></i>
                 <span class="text-2xl font-bold text-white">DjangoAI</span>
             </div>
+            <div class="search-container">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    class="search-input" 
+                    placeholder="Search conversations..."
+                    autocomplete="off"
+                >
+                <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <div id="searchResults" class="search-results">
+                </div>
+            </div>
             <div class="px-6 py-4">
                 <button id="new-chat" class="w-full flex items-center justify-center px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none transition duration-200 shadow-md">
                     <i class="fas fa-plus mr-2"></i> New Chat
@@ -50,15 +65,15 @@
                 <div class="flex items-center space-x-6">
                     <div class="flex items-center space-x-4">
                         <div class="flex items-center">
-                            <span class="text-sm text-gray-300">Oobabooga API:</span>
-                            {% if txt_api_status == 'Online' %}
-                                <span class="text-sm text-green-500 ml-1">{{ txt_api_status }}</span>
+                            <span class="text-sm text-gray-300">Ooba API:</span>
+                            {% if ooba_api_status == 'Online' %}
+                                <span class="text-sm text-green-500 ml-1">{{ ooba_api_status }}</span>
                             {% else %}
-                                <span class="text-sm text-red-500 ml-1">{{ txt_api_status }}</span>
+                                <span class="text-sm text-red-500 ml-1">{{ ooba_api_status }}</span>
                             {% endif %}
                         </div>
                         <div class="flex items-center">
-                            <span class="text-sm text-gray-300">Stable Diffusion API:</span>
+                            <span class="text-sm text-gray-300">Image API:</span>
                             {% if img_api_status == 'Online' %}
                                 <span class="text-sm text-green-500 ml-1">{{ img_api_status }}</span>
                             {% else %}
@@ -117,6 +132,14 @@
                 </button>
                 </form>
             </footer>
+            <div class="bg-gray-800 px-6 pb-2">
+                <p class="text-xs text-gray-400 italic flex items-center justify-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Language models may sometimes generate incorrect, harmful, offensive, or biased information.
+                </p>
+            </div>
         </main>
     </div>
     <div id="delete-modal" class="modal-overlay">
@@ -267,6 +290,7 @@
                         deleteButton.onclick = (e) => {
                             e.stopPropagation();
                             deleteConversation(conv.id);
+                        
                         };
 
                         buttonsContainer.appendChild(shareButton);
@@ -314,7 +338,9 @@
                             currentConversationId = null;
                             document.getElementById('chat-window').innerHTML = '';
                             document.getElementById('conversation-title').textContent = 'Select a conversation or start a new one.';
+
                         }
+                        window.location.reload();
                         loadConversations();
                         modal.style.display = 'none';
                     } else {
@@ -335,7 +361,19 @@
                 }
             }
         }
-
+        function addCopyButtonsToCodeBlocks(container) {
+            container.querySelectorAll('pre code').forEach((block, index) => {
+                if (!block.parentNode.querySelector('.copy-code-btn')) {
+                    const copyCodeBtn = document.createElement('button');
+                    copyCodeBtn.classList.add('copy-code-btn');
+                    copyCodeBtn.innerHTML = '<i class="fas fa-code mr-1"></i> Copy Code';
+                    copyCodeBtn.title = "Copy code block";
+                    copyCodeBtn.addEventListener('click', () => copyCodeBlock(block));
+                    block.parentNode.insertBefore(copyCodeBtn, block);
+                }
+                hljs.highlightElement(block);
+            });
+        }
         function loadMessages() {
             if (!currentConversationId) return;
             axios.get("{% url 'get_messages' %}", { params: { conversation_id: currentConversationId } })
@@ -343,7 +381,7 @@
                     const messages = response.data.messages;
                     const chatWindow = document.getElementById('chat-window');
                     chatWindow.innerHTML = '';
-                    messages.forEach(msg => {
+                    messages.forEach((msg, index) => {
                         const div = document.createElement('div');
                         div.classList.add('mb-4', 'flex');
                         if (msg.sender === 'user') {
@@ -371,14 +409,25 @@
                                         <button class="copy-btn" title="Copy message">
                                             <i class="fas fa-copy mr-1"></i> Copy
                                         </button>
+                                        ${index === messages.length - 1 && msg.sender !== 'user' ? `
+                                            <button class="regenerate-btn mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition duration-200">
+                                                <i class="fas fa-redo mr-1"></i> Regenerate
+                                            </button>
+                                        ` : ''}
                                     </div>
                                 `;
+                                if (msg.sender === 'bot' && msg.text) {
+                                        createReactionButtons(msg, div);
+                                    }
                                 const copyBtn = div.querySelector('.copy-btn');
                                 copyBtn.addEventListener('click', () => copyMessage(msg.text));
-                                // Apply syntax highlighting
-                                div.querySelectorAll('pre code').forEach((block) => {
-                                    hljs.highlightElement(block);
-                                });
+
+                                const regenerateBtn = div.querySelector('.regenerate-btn');
+                                if (regenerateBtn) {
+                                    regenerateBtn.addEventListener('click', () => regenerateResponse());
+                                }
+
+                                addCopyButtonsToCodeBlocks(div);
                             } else if (msg.image_url) {
                                 div.innerHTML = `
                                     <div class="max-w-md rounded-lg px-4 py-2 bg-gray-700 text-white shadow-md chat-bubble">
@@ -397,6 +446,93 @@
                 .catch(error => {
                     console.error('Error loading messages:', error);
                 });
+        }
+
+
+        function regenerateResponse() {
+            if (!currentConversationId) return;
+
+            const chatWindow = document.getElementById('chat-window');
+            const messages = chatWindow.querySelectorAll('.chat-bubble');
+            if (messages.length < 2) return;
+            const lastBotMessage = messages[messages.length - 1];
+            if (lastBotMessage.closest('.justify-start')) {
+                lastBotMessage.closest('.mb-4').remove();
+            }
+            document.getElementById('message-input').disabled = true;
+            axios.post("{% url 'regenerate_response' %}", {
+                conversation_id: currentConversationId,
+            }).then(response => {
+                const botDiv = document.createElement('div');
+                botDiv.classList.add('mb-4', 'flex', 'justify-start');
+                
+                const parsedResponse = marked.parse(sanitizeMarkdown(response.data.response));
+                
+                botDiv.innerHTML = `
+                    <div class="relative max-w-md rounded-lg px-4 py-2 bg-gray-700 text-white shadow-md chat-bubble">
+                        ${parsedResponse}
+                        <button class="copy-btn" title="Copy message">
+                            <i class="fas fa-copy mr-1"></i> Copy
+                        </button>
+                        <button class="regenerate-btn mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition duration-200">
+                            <i class="fas fa-redo mr-1"></i> Regenerate
+                        </button>
+                    </div>
+                `;
+
+                const copyBtn = botDiv.querySelector('.copy-btn');
+                copyBtn.addEventListener('click', () => copyMessage(response.data.response));
+
+                const regenerateBtn = botDiv.querySelector('.regenerate-btn');
+                regenerateBtn.addEventListener('click', () => regenerateResponse());
+                
+                addCopyButtonsToCodeBlocks(botDiv);
+                
+                chatWindow.appendChild(botDiv);
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+                document.querySelector('.credits').textContent = parseInt(document.querySelector('.credits').textContent) - 1;
+                document.getElementById('message-input').disabled = false;
+
+            })
+            .catch(error => {
+                console.error('Error regenerating response:', error);
+                alert('Failed to regenerate response. Please try again.');
+            });
+        }
+        function copyCodeBlock(codeBlock) {
+
+            code = codeBlock.textContent.replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+            
+            navigator.clipboard.writeText(code).then(() => {
+                showNotification('Code block copied!');
+            }).catch(err => {
+                console.error('Failed to copy code block: ', err);
+                showNotification('Failed to copy code block', 'error');
+            });
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.textContent = message;
+            notification.classList.add('fixed', 'bottom-4', 'right-4', 'px-4', 'py-2', 'rounded', 'shadow-lg', 'transition-opacity', 'duration-300');
+            
+            switch(type) {
+                case 'success':
+                    notification.classList.add('bg-green-500', 'text-white');
+                    break;
+                case 'error':
+                    notification.classList.add('bg-red-500', 'text-white');
+                    break;
+                case 'warning':
+                    notification.classList.add('bg-yellow-500', 'text-white');
+                    break;
+            }
+            
+            document.body.appendChild(notification);
+            setTimeout(() => {
+                notification.classList.add('opacity-0');
+                setTimeout(() => notification.remove(), 300);
+            }, 2000);
         }
 
         function copyMessage(text) {
@@ -435,6 +571,12 @@
             if (message.trim() === '') return;
 
             const chatWindow = document.getElementById('chat-window');
+            
+            const previousRegenerateBtn = chatWindow.querySelector('.regenerate-btn');
+            if (previousRegenerateBtn) {
+                previousRegenerateBtn.remove();
+            }
+
             const userDiv = document.createElement('div');
             userDiv.classList.add('mb-4', 'flex', 'justify-end');
             userDiv.innerHTML = `
@@ -467,6 +609,9 @@
                         <button class="copy-btn" title="Copy message">
                             <i class="fas fa-copy mr-1"></i> Copy
                         </button>
+                        <button class="regenerate-btn mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition duration-200">
+                            <i class="fas fa-redo mr-1"></i> Regenerate
+                        </button>
                     </div>
                 `;
                 if (response.data.summary) {
@@ -475,20 +620,27 @@
                 }
                 const copyBtn = botDiv.querySelector('.copy-btn');
                 copyBtn.addEventListener('click', () => copyMessage(response.data.response));
+
+                const regenerateBtn = botDiv.querySelector('.regenerate-btn');
+                regenerateBtn.addEventListener('click', () => regenerateResponse());
+
                 chatWindow.appendChild(botDiv);
                 
                 botDiv.querySelectorAll('pre code').forEach((block) => {
                     hljs.highlightElement(block);
                 });
                 
+                addCopyButtonsToCodeBlocks(botDiv);
+                
                 chatWindow.scrollTop = chatWindow.scrollHeight;
                 messageInput.disabled = false;
-                document.querySelector('.credits').textContent = parseInt(document.querySelector('.credits').textContent) -1;
+                document.querySelector('.credits').textContent = parseInt(document.querySelector('.credits').textContent) - 1;
                 focusMessageInput();
             })
             .catch(error => {
                 console.error('Error sending message:', error);
                 alert('Failed to send message. Please try again.');
+                messageInput.disabled = false;
             });
         });
 
@@ -594,6 +746,7 @@
             }
         });
         document.getElementById('image-generation-button').addEventListener('click', function () {
+            if (document.getElementById('message-input').disabled) return;
             document.getElementById('image-generation-modal').style.display = 'flex';
         });
 
@@ -732,6 +885,237 @@
                         this.classList.remove('flex');
                     }
                 });
+                function createReactionButtons(message, msgDiv) {
+                if (message.sender === 'bot' && message.text) {
+                    const reactionContainer = document.createElement('div');
+                    reactionContainer.classList.add('flex', 'items-center', 'mt-2', 'space-x-2');
+                    
+                    const reactions = [
+                        { type: 'up', icon: 'fa-thumbs-up', label: 'Helpful' },
+                        { type: 'down', icon: 'fa-thumbs-down', label: 'Not Helpful' }
+                    ];
+                    
+                    reactions.forEach(reaction => {
+                        const button = document.createElement('button');
+                        button.classList.add(
+                            'reaction-btn',
+                            'flex',
+                            'items-center',
+                            'space-x-1',
+                            'px-2',
+                            'py-1',
+                            'rounded-md',
+                            'text-sm',
+                            'transition-colors',
+                            'duration-200'
+                        );
+                        
+                        if (message.user_reaction === reaction.type) {
+                            button.classList.add('bg-indigo-600', 'text-white');
+                        } else {
+                            button.classList.add('bg-gray-700', 'hover:bg-gray-600');
+                        }
+                        
+                        const count = message.reaction_counts ? message.reaction_counts[reaction.type] || 0 : 0;
+                        
+                        button.innerHTML = `
+                            <i class="fas ${reaction.icon}"></i>
+                            <span class="reaction-count">${count}</span>
+                            <span class="ml-1">${reaction.label}</span>
+                        `;
+                        
+                        button.onclick = async (e) => {
+                            e.stopPropagation();
+                            try {
+                                console.log('Sending reaction:', message.id, reaction.type);
+                                const response = await axios.post("{% url 'toggle_reaction' %}", {
+                                    message_id: message.id,
+                                    reaction: reaction.type
+                                });
+                                
+                                if (response.data.status === 'success') {
+                                    const counts = response.data.reaction_counts;
+                                    const allButtons = reactionContainer.querySelectorAll('.reaction-btn');
+                                    
+                                    allButtons.forEach(btn => {
+                                        btn.classList.remove('bg-indigo-600', 'text-white');
+                                        btn.classList.add('bg-gray-700');
+                                    });
+                                    
+                                    reactionContainer.querySelectorAll('.reaction-count').forEach((countSpan, index) => {
+                                        const reactionType = reactions[index].type;
+                                        countSpan.textContent = counts[reactionType] || 0;
+                                    });
+                                    
+                                    if (counts[reaction.type] > count) {
+                                        button.classList.remove('bg-gray-700');
+                                        button.classList.add('bg-indigo-600', 'text-white');
+                                    }
+                                    
+                                    showNotification(`Reaction ${counts[reaction.type] > count ? 'added' : 'removed'}!`, 'success');
+                                }
+                            } catch (error) {
+                                console.error('Error toggling reaction:', error);
+                                showNotification('Failed to update reaction', 'error');
+                            }
+                        };
+                        
+                        reactionContainer.appendChild(button);
+                    });
+                    
+                    const messageContent = msgDiv.querySelector('.chat-bubble');
+                    const regenerateBtn = messageContent.querySelector('.regenerate-btn');
+                    if (regenerateBtn) {
+                        messageContent.insertBefore(reactionContainer, regenerateBtn);
+                    } else {
+                        messageContent.appendChild(reactionContainer);
+                    }
+                }
+            }
+            document.addEventListener('DOMContentLoaded', function() {
+                const searchInput = document.getElementById('searchInput');
+                const searchResults = document.getElementById('searchResults');
+                let searchTimeout;
+                
+                function highlightText(text, query) {
+                    if (!query || !text) return text;
+                    const regex = new RegExp(`(${query})`, 'gi');
+                    return text.replace(regex, '<span class="search-highlight">$1</span>');
+                }
+                
+                function formatDate(dateString) {
+                    const date = new Date(dateString);
+                    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+                }
+                
+                function createLoadingElement() {
+                    return `
+                        <div class="search-loading">
+                            <div class="flex items-center justify-center space-x-2 text-gray-400">
+                                <svg class="spin w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <circle cx="12" cy="12" r="10" stroke-width="4" stroke-dasharray="30 30" stroke-linecap="round"/>
+                                </svg>
+                                <span>Searching...</span>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                function renderSearchResults(results, query) {
+                    if (results.length === 0) {
+                        searchResults.innerHTML = `
+                            <div class="search-result-item p-4">
+                                <p class="text-gray-400">No results found</p>
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    searchResults.innerHTML = results.map(result => `
+                        <div class="search-result-item p-4 hover:bg-gray-700 cursor-pointer" data-conversation-id="${result.id}">
+                            <div class="search-result-summary font-medium text-indigo-400 mb-2">
+                                ${highlightText(result.summary, query)}
+                            </div>
+                            ${result.matching_messages.map(msg => `
+                                <div class="search-result-message mb-2 text-sm">
+                                    <span class="text-${msg.sender === 'user' ? 'indigo' : 'green'}-400">
+                                        ${msg.sender === 'user' ? 'You' : 'Assistant'}:
+                                    </span>
+                                    <span class="text-gray-300">
+                                        ${highlightText(msg.text.substring(0, 100) + (msg.text.length > 100 ? '...' : ''), query)}
+                                    </span>
+                                </div>
+                            `).join('')}
+                            <div class="search-meta text-xs text-gray-500 mt-2">
+                                ${formatDate(result.created_at)}
+                            </div>
+                        </div>
+                    `).join('');
+                    
+                    document.querySelectorAll('.search-result-item').forEach(item => {
+                        item.addEventListener('click', () => {
+                            const conversationId = item.dataset.conversationId;
+                            currentConversationId = conversationId;
+                            loadMessages();
+                            highlightConversation(conversationId);
+                            searchResults.classList.remove('show');
+                            searchInput.value = '';
+                        });
+                    });
+                }
+                
+                async function performSearch(query) {
+                    if (!query.trim()) {
+                        searchResults.classList.remove('show');
+                        return;
+                    }
+                    
+                    searchResults.classList.add('show');
+                    searchResults.innerHTML = createLoadingElement();
+                    
+                    try {
+                        const response = await fetch(`/ajax/search_conversations/?q=${encodeURIComponent(query)}`, {
+                            headers: {
+                                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                            }
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error('Search request failed');
+                        }
+                        
+                        const data = await response.json();
+                        renderSearchResults(data.results, query);
+                    } catch (error) {
+                        console.error('Search failed:', error);
+                        searchResults.innerHTML = `
+                            <div class="search-result-item p-4">
+                                <p class="text-red-400">Error performing search</p>
+                            </div>
+                        `;
+                    }
+                }
+                
+                searchInput.addEventListener('input', (e) => {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        performSearch(e.target.value);
+                    }, 300);
+                });
+                
+                document.addEventListener('click', (e) => {
+                    if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+                        searchResults.classList.remove('show');
+                    }
+                });
+                
+                searchInput.addEventListener('focus', () => {
+                    if (searchInput.value.trim()) {
+                        searchResults.classList.add('show');
+                    }
+                });
+                
+                searchInput.addEventListener('keydown', (e) => {
+                    const results = document.querySelectorAll('.search-result-item');
+                    const currentIndex = Array.from(results).findIndex(result => result === document.activeElement);
+                    
+                    switch (e.key) {
+                        case 'Enter':
+                            e.preventDefault();
+                            if (document.activeElement.classList.contains('search-result-item')) {
+                                document.activeElement.click();
+                            }
+                            break;
+                            
+                        case 'Escape':
+                            e.preventDefault();
+                            searchResults.classList.remove('show');
+                            searchInput.blur();
+                            break;
+                    }
+                });
+            });
+                      
         loadConversations();
         focusMessageInput();
     </script>

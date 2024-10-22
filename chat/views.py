@@ -8,8 +8,9 @@ from django.views.decorators.http import require_GET
 from django.contrib import messages
 from django.http import JsonResponse
 from django.core.files.base import ContentFile
+from django.db.models import Q
 
-from .models import Conversation, Message, Credits, Prompt
+from .models import Conversation, Message, Credits, Prompt, MessageReaction
 from .forms import CustomPasswordChangeForm, OTPEnableForm, CustomAuthenticationForm, BackendAPIChoiceForm
 
 import os
@@ -27,7 +28,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-txt_url =  os.getenv("OOBABOOGA_URL")
+ooba_url =  os.getenv("OOBABOOGA_URL")
 img_url = os.getenv("STABLEDIFFUSION_URL")
 
 # ==============================================================================
@@ -54,10 +55,9 @@ def check_api_status(url):
     except Exception:
         return 'Offline'
 
-def check_txt_api_status():
+def check_ooba_api_status():
     """Checks the status of the Oobabooga API."""
-    return check_api_status(txt_url)
-
+    return check_api_status(ooba_url)
 def check_img_api_status():
     """Checks the status of the StableDiffusion API."""
     return check_api_status(img_url)
@@ -67,6 +67,7 @@ def check_img_api_status():
 # ==============================================================================
 # Section 2: External API Integrations
 # ==============================================================================
+
 
 def send_to_nebius(conversation, credits_object):
     """
@@ -135,7 +136,7 @@ def send_to_oobabooga(conversation, credits_object):
         "frequency_penalty": 0.45,
     }
     try:
-        response = requests.post(txt_url, headers=headers, json=data)
+        response = requests.post(ooba_url, headers=headers, json=data)
         if response.status_code == 200:
             response_json = response.json()
             assistant_message = response_json['choices'][0]['message']['content']
@@ -255,9 +256,9 @@ def chat_view(request):
         Credits.objects.create(user=user, credits=500)
     credits = Credits.objects.get(user=request.user).credits
     initials = user.username[:2].upper()
-    txt_api_status = check_txt_api_status()
+    ooba_api_status = check_ooba_api_status()
     img_api_status = check_img_api_status()
-    return render(request, 'chat.html', {'conversations': conversations,'credits': credits,'initials': initials,'txt_api_status': txt_api_status,'img_api_status': img_api_status})
+    return render(request, 'chat.html', {'conversations': conversations,'credits': credits,'initials': initials,'ooba_api_status': ooba_api_status,'img_api_status': img_api_status})
 
 @login_required
 def send_message(request):
@@ -323,10 +324,13 @@ def get_messages(request):
     conversation = get_object_or_404(Conversation, id=conversation_id, user=request.user)
     messages = conversation.messages.order_by('timestamp')
     messages_data = [{
+        'id': msg.id,
         'sender': msg.sender,
         'text': msg.text,
         'image_url': msg.image.url if msg.image else None,
-        'timestamp': msg.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        'timestamp': msg.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+        'reaction_counts': msg.reaction_counts,
+        'user_reaction': msg.reactions.filter(user=request.user).values_list('reaction', flat=True).first()
     } for msg in messages]
     return JsonResponse({'messages': messages_data, 'summary': conversation.summary})
 
@@ -607,6 +611,8 @@ def profile_view(request):
                 messages.error(request, 'Please correct the errors below.')
             otp_form = OTPEnableForm()
         elif 'update_backend_api' in request.POST:
+
+
             backend_api_form = BackendAPIChoiceForm(request.POST, instance=profile)
             if backend_api_form.is_valid():
                 backend_api_form.save()
@@ -658,3 +664,129 @@ def profile_view(request):
         otp_form = OTPEnableForm()
         backend_api_form = BackendAPIChoiceForm(instance=profile)
     return render(request, 'profile.html', {'form': form,'otp_form': otp_form,'profile': profile,'backend_api_form': backend_api_form,})
+
+@login_required
+def regenerate_response(request):
+    """
+    Regenerates the last assistant response in a conversation.
+
+    Args:
+        request (HttpRequest): The HTTP request object.
+
+    Returns:
+        JsonResponse: Contains the new assistant's response.
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            conversation_id = data.get('conversation_id')
+            conversation = get_object_or_404(Conversation, id=conversation_id, user=request.user)
+            last_bot_message = conversation.messages.filter(sender='bot').last()
+            if last_bot_message:
+                last_bot_message.delete()
+            last_user_message = conversation.messages.filter(sender='user').last()
+            if not last_user_message:
+                return JsonResponse({'error': 'No user message found to regenerate from'}, status=400)
+            credits = Credits.objects.get(user=request.user)
+            if credits.credits <= 0:
+                return JsonResponse({'error': 'You have no credits left. Please buy more credits to continue.'}, status=400)
+
+            backend_api = request.user.profile.backend_api_choice
+            response_text = send_to_backend(conversation, credits, backend_api)
+            new_bot_message = Message.objects.create(conversation=conversation, sender='bot', text=response_text)
+            return JsonResponse({'response': response_text})
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+@login_required
+def toggle_reaction(request):
+    """
+    Toggle a reaction (thumbs up/down) on an assistant message
+
+    Args:
+        request (HttpRequest): The HTTP request object.
+
+    Returns:
+        JsonResponse: Contains the updated reaction counts.
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            message_id = data.get('message_id')
+            reaction_type = data.get('reaction')
+            if reaction_type not in ['up', 'down']:
+                return JsonResponse({'error': 'Invalid reaction type'}, status=400)
+            message = get_object_or_404(Message, id=message_id)
+            
+            if message.sender != 'bot':
+                return JsonResponse({'error': 'Can only react to assistant messages'}, status=400)       
+            existing_reaction = MessageReaction.objects.filter(
+                message=message,
+                user=request.user
+            ).first()
+            
+            if existing_reaction:
+                if existing_reaction.reaction == reaction_type:
+                    existing_reaction.delete()
+                else:
+                    existing_reaction.reaction = reaction_type
+                    existing_reaction.save()
+            else:
+                MessageReaction.objects.create(
+                    message=message,
+                    user=request.user,
+                    reaction=reaction_type
+                )
+            return JsonResponse({
+                'reaction_counts': message.reaction_counts,
+                'status': 'success'
+            })
+            
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+            
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+@login_required
+def search_conversations(request):
+    """
+    Search through user's conversations and messages.
+    Returns conversations that match the search query in messages or summary.
+
+    Args:
+        request (HttpRequest): The HTTP request object.
+
+    Returns:
+        JsonResponse: Contains the search result conversations.
+    """
+    query = request.GET.get('q', '').strip()
+    if not query:
+        return JsonResponse({'results': []})
+    
+    conversations = Conversation.objects.filter(
+        user=request.user
+    ).filter(
+        Q(messages__text__icontains=query) | Q(summary__icontains=query)      
+    ).distinct()
+    
+    results = []
+    for conv in conversations:
+        matching_messages = conv.messages.filter(
+            text__icontains=query
+        ).order_by('timestamp')[:3]
+        
+        results.append({
+            'id': conv.id,
+            'summary': conv.summary or 'No summary available',
+            'created_at': conv.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+            'matching_messages': [
+                {
+                    'text': msg.text,
+                    'sender': msg.sender,
+                    'timestamp': msg.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                }
+                for msg in matching_messages
+            ]
+        })
+    
+    return JsonResponse({'results': results})

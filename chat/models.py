@@ -22,7 +22,12 @@ class Message(models.Model):
     text = models.TextField()
     image = models.ImageField(upload_to='generated_images/', blank=True, null=True)
     timestamp = models.DateTimeField(auto_now_add=True)
-
+    @property
+    def reaction_counts(self):
+        return {
+            'up': self.reactions.filter(reaction='up').count(),
+            'down': self.reactions.filter(reaction='down').count()
+        }
 class Credits(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     credits = models.IntegerField()
@@ -75,3 +80,16 @@ class Prompt(models.Model):
     
     def __str__(self):
         return self.name
+    
+class MessageReaction(models.Model):
+    REACTION_CHOICES = [
+        ('up', 'Thumbs Up'),
+        ('down', 'Thumbs Down')
+    ]
+    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name='reactions')
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    reaction = models.CharField(max_length=5, choices=REACTION_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ['message', 'user']

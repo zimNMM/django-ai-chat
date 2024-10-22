@@ -36,6 +36,7 @@ class BackendAPIChoiceForm(forms.ModelForm):
             self.fields['selected_character'].queryset = OobaboogaCharacter.objects.all()
             self.fields['selected_character'].required = True
             self.fields['selected_model'].widget = forms.HiddenInput()
+            
         else:
             self.fields['selected_model'].widget = forms.HiddenInput()
             self.fields['selected_character'].widget = forms.HiddenInput()

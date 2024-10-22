@@ -22,6 +22,9 @@ urlpatterns = [
     path('ajax/export/', views.export_all_conversations, name='export_all_conversations'),
     path('ajax/generate_image/', views.generate_image, name='generate_image'),
     path('ajax/get_prompts/', views.get_prompts, name='get_prompts'),
+    path('ajax/regenerate_response/', views.regenerate_response, name='regenerate_response'),
+    path('ajax/toggle_reaction/', views.toggle_reaction, name='toggle_reaction'),
+    path('ajax/search_conversations/', views.search_conversations, name='search_conversations'),
     path('conversations/<uuid:uuid>/', views.public_conversation_view, name='public_conversation'),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
