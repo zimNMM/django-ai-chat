@@ -7,12 +7,17 @@
     <title>User Profile - DjangoAI</title>
     <meta charset="UTF-8">
     <meta name="csrf-token" content="{{ csrf_token }}">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://kit.fontawesome.com/38683e14e9.js" crossorigin="anonymous"></script>
+    <script src="{% static 'css/tailwind.css' %}"></script>
+    <script src="{% static 'js/fontawesome.js' %}" crossorigin="anonymous"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{% static 'js/jquery.js' %}"></script>
+    <script src="{% static 'js/axios.js' %}"></script>
     <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
+    <script src="{% static 'js/marked.js' %}"></script>
+    <link rel="stylesheet" href="{% static 'css/github.css' %}">
+    <script src="{% static 'js/highlight.js' %}"></script>
+    <script>hljs.highlightAll();</script>
 </head>
 <body class="bg-gray-950 text-gray-100">
     <div class="min-h-screen flex items-center justify-center">
@@ -107,6 +112,12 @@
                             {{ backend_api_form.selected_ollama_model.label }}
                         </label>
                         {{ backend_api_form.selected_ollama_model }}
+                    </div>
+                    <div class="mb-4" id="openai-model-div">
+                        <label for="{{ backend_api_form.selected_ollama_model.id_for_label }}" class="block text-sm font-medium mb-1 text-gray-300">
+                            {{ backend_api_form.selected_openai_model.label }}
+                        </label>
+                        {{ backend_api_form.selected_openai_model }}
                     </div>
                     <button type="submit" name="update_backend_api" class="w-full mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition duration-200">
                         Update Backend API
@@ -342,19 +353,20 @@
             var nebiusModelDiv = document.getElementById("nebius-model-div");
             var oobaboogaCharacterDiv = document.getElementById("oobabooga-character-div");
             var ollamaModelDiv = document.getElementById("ollama-model-div");
-
-            // Hide all divs first
+            var openaiModelDiv = document.getElementById("openai-model-div");
             nebiusModelDiv.style.display = "none";
             oobaboogaCharacterDiv.style.display = "none";
             ollamaModelDiv.style.display = "none";
+            openaiModelDiv.style.display = "none";
 
-            // Show the appropriate div based on selection
             if (selectedValue === "nebius") {
                 nebiusModelDiv.style.display = "block";
             } else if (selectedValue === "oobabooga") {
                 oobaboogaCharacterDiv.style.display = "block";
             } else if (selectedValue === "ollama") {
                 ollamaModelDiv.style.display = "block";
+            }else if (selectedValue === "openai") {
+                openaiModelDiv.style.display = "block";
             }
         }
 

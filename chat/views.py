@@ -95,67 +95,49 @@ def sync_ollama_models():
     except Exception as e:
         print(f"Error syncing Ollama models: {e}")
         return False
-
-def send_to_ollama(conversation, credits_object):
+    
+def send_to_openai(conversation, credits_object, backend_api):
     """
-    Sends conversation to the Ollama API and retrieves the assistant's response.
+    Sends conversation to the routed backend using the OpenAI library.
 
     Args:
         conversation (Conversation): The conversation object.
         credits_object (Credits): The user's credits object.
+        backend_api (str): The chosen backend API openAI,Nebius or Ollama.
 
     Returns:
         str: Assistant's response or an error message.
     """
-    ollama_client = OpenAI(base_url = 'http://localhost:11434/v1',api_key='ollama')
+    profile = conversation.user.profile
+
+    if backend_api == 'openai':
+        api_key = os.getenv("OPENAI_API_KEY")
+        url = "https://api.openai.com/v1/"
+        selected_model = profile.selected_openai_model.name if profile.selected_openai_model else None
+        if not selected_model:
+            return 'Error: No OpenAI model selected.'
+    elif backend_api == 'ollama':
+        api_key = "ollama"
+        url = "http://localhost:11434/v1"
+        selected_model = profile.selected_ollama_model.name if profile.selected_ollama_model else None
+        if not selected_model:
+            return 'Error: No Ollama model selected.'
+    elif backend_api == 'nebius':
+        api_key = os.getenv("NEBIUS_API_KEY")
+        url = "https://api.studio.nebius.ai/v1/"
+        selected_model = profile.selected_model.name if profile.selected_model else None
+        if not selected_model:
+            return 'Error: No Nebius model selected.'
+
+    openai_client = OpenAI(base_url = url, api_key = api_key)
     messages = conversation.messages.order_by('timestamp')
     history = []
 
     for msg in messages:
         role = 'user' if msg.sender == 'user' else 'assistant'
         history.append({'role': role, 'content': msg.text})
-    print (history)
-
-    profile = conversation.user.profile
-    selected_model = profile.selected_ollama_model.name if profile.selected_ollama_model else None 
-    if not selected_model:
-        return 'Error: No Ollama model selected.'
     try:
-        response = ollama_client.chat.completions.create(
-            model=selected_model,
-            messages=history,
-        )
-        assistant_message = response.choices[0].message.content.strip()
-        credits_object.credits -= 1
-        credits_object.save()
-        return assistant_message
-    except Exception as e:
-        return f'Error: {str(e)}'
-def send_to_nebius(conversation, credits_object):
-    """
-    Sends conversation to the Nebius API and retrieves the assistant's response.
-
-    Args:
-        conversation (Conversation): The conversation object.
-        credits_object (Credits): The user's credits object.
-
-    Returns:
-        str: Assistant's response or an error message.
-    """
-    nebius_client = OpenAI(base_url="https://api.studio.nebius.ai/v1/",api_key=os.getenv("NEBIUS_API_KEY"))
-    messages = conversation.messages.order_by('timestamp')
-    history = []
-
-    for msg in messages:
-        role = 'user' if msg.sender == 'user' else 'assistant'
-        history.append({'role': role, 'content': msg.text})
-    print (history)
-    profile = conversation.user.profile
-    selected_model = profile.selected_model.name if profile.selected_model else None 
-    if not selected_model:
-        return 'Error: No Nebius model selected.'
-    try:
-        response = nebius_client.chat.completions.create(
+        response = openai_client.chat.completions.create(
             model=selected_model,
             messages=history,
         )
@@ -287,7 +269,7 @@ def send_to_backend(conversation, credits_object, backend_api):
     Args:
         conversation (Conversation): The conversation object.
         credits_object (Credits): The user's credits object.
-        backend_api (str): The chosen backend API ('oobabooga' or 'nebius').
+        backend_api (str): The chosen backend API.
 
     Returns:
         str: Assistant's response or an error message.
@@ -295,9 +277,11 @@ def send_to_backend(conversation, credits_object, backend_api):
     if backend_api == 'oobabooga':
         return send_to_oobabooga(conversation, credits_object)
     elif backend_api == 'nebius':
-        return send_to_nebius(conversation, credits_object)
+        return send_to_openai(conversation, credits_object, backend_api)
     elif backend_api == 'ollama':
-        return send_to_ollama(conversation, credits_object)
+        return send_to_openai(conversation, credits_object, backend_api)
+    elif backend_api == 'openai':
+        return send_to_openai(conversation, credits_object, backend_api)
     else:
         return 'Error: Unsupported backend API.'
 # ==============================================================================
@@ -553,7 +537,7 @@ def generate_image(request):
                     image_content = ContentFile(image, unique_filename)
                     bot_message = Message.objects.create(conversation=conversation, sender='bot')
                     bot_message.image.save(unique_filename, image_content)
-                    credits.credits -= 10
+                    credits.credits -= 5
                     credits.save()
                     return JsonResponse({'image_url': bot_message.image.url, 'conversation_id': conversation.id})
                 else:

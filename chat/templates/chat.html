@@ -7,16 +7,16 @@
         <title>Chat - DjangoAI</title>
         <meta charset="UTF-8">
         <meta name="csrf-token" content="{{ csrf_token }}">
-        <script src="https://cdn.tailwindcss.com"></script>
-        <script src="https://kit.fontawesome.com/38683e14e9.js" crossorigin="anonymous"></script>
+        <script src="{% static 'css/tailwind.css' %}"></script>
+        <script src="{% static 'js/fontawesome.js' %}" crossorigin="anonymous"></script>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+        <script src="{% static 'js/jquery.js' %}"></script>
+        <script src="{% static 'js/axios.js' %}"></script>
         <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
-        <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github-dark.min.css">
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+        <script src="{% static 'js/marked.js' %}"></script>
+        <link rel="stylesheet" href="{% static 'css/github.css' %}">
+        <script src="{% static 'js/highlight.js' %}"></script>
         <script>hljs.highlightAll();</script>
     </head>
 <body class="bg-gray-950 text-gray-100">
@@ -917,7 +917,6 @@
                     const reactionContainer = document.createElement('div');
                     reactionContainer.classList.add('mt-6', 'pt-4', 'border-t', 'border-gray-700');
                     
-                    // Add decorative line with gradient
                     const decorativeLine = `
                         <div class="mb-2 flex items-center">
                             <div class="flex-grow h-px bg-gradient-to-r from-transparent via-gray-600 to-transparent"></div>
@@ -957,21 +956,17 @@
                         </div>
                     `;
 
-                    // Add click handlers for the reaction buttons
                     reactionContainer.querySelectorAll('.reaction-btn').forEach(button => {
                         button.addEventListener('click', async (e) => {
                             e.stopPropagation();
                             const reactionType = button.dataset.reaction;
                             const isUp = reactionType === 'up';
                             
-                            // Immediately update UI
                             const otherButton = button.parentElement.querySelector(`.reaction-btn[data-reaction="${isUp ? 'down' : 'up'}"]`);
                             
-                            // Remove active state from other button
                             otherButton.classList.remove(isUp ? 'bg-red-600' : 'bg-green-600', 'text-white');
                             otherButton.classList.add('bg-gray-700', 'hover:bg-gray-600', 'text-gray-300');
                             
-                            // Toggle current button
                             if (button.classList.contains(isUp ? 'bg-green-600' : 'bg-red-600')) {
                                 button.classList.remove(isUp ? 'bg-green-600' : 'bg-red-600', 'text-white');
                                 button.classList.add('bg-gray-700', 'hover:bg-gray-600', 'text-gray-300');
@@ -989,7 +984,6 @@
                                 if (response.data.status === 'success') {
                                     const counts = response.data.reaction_counts;
                                     
-                                    // Update reaction counts
                                     reactionContainer.querySelectorAll('.reaction-btn').forEach(btn => {
                                         const isUpBtn = btn.dataset.reaction === 'up';
                                         const count = isUpBtn ? counts.up : counts.down;
@@ -1003,7 +997,6 @@
                                 console.error('Error toggling reaction:', error);
                                 showNotification('Failed to update reaction', 'error');
                                 
-                                // Revert UI changes on error
                                 button.classList.toggle('bg-gray-700');
                                 button.classList.toggle('hover:bg-gray-600');
                                 button.classList.toggle('text-gray-300');

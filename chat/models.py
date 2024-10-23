@@ -49,6 +49,12 @@ class OobaboogaCharacter(models.Model):
     def __str__(self):
         return self.name
     
+class OpenAIModel(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+
+    def __str__(self):
+        return self.name
+    
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     otp_enabled = models.BooleanField(default=False)
@@ -57,12 +63,14 @@ class Profile(models.Model):
         ('oobabooga', 'Oobabooga'),
         ('nebius', 'Nebius'),
         ('ollama', 'Ollama'),
+        ('openai', 'OpenAI'),
     ]
     
     backend_api_choice = models.CharField(max_length=20, choices=BACKEND_API_CHOICES, default='oobabooga')
     selected_model = models.ForeignKey(NebiusModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='profiles')
     selected_character = models.ForeignKey(OobaboogaCharacter, on_delete=models.SET_NULL, null=True, blank=True, related_name='profiles')
     selected_ollama_model = models.ForeignKey(OllamaModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='ollama_profiles')
+    selected_openai_model = models.ForeignKey(OpenAIModel, on_delete=models.SET_NULL, null=True, blank=True, related_name='openai_profiles')
     
     def __str__(self):
         return f'Profile for {self.user.username}'

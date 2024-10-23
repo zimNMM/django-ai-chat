@@ -2,7 +2,7 @@
 
 from django.contrib import admin
 
-from .models import Prompt, Credits, NebiusModel, OobaboogaCharacter, Profile, OllamaModel
+from .models import Prompt, Credits, NebiusModel, OobaboogaCharacter, Profile, OllamaModel, OpenAIModel
 
 @admin.register(Credits)
 class CreditsAdmin(admin.ModelAdmin):
@@ -26,6 +26,11 @@ class OobaboogaCharacterAdmin(admin.ModelAdmin):
 
 @admin.register(OllamaModel)
 class OllamaModelAdmin(admin.ModelAdmin):
+    list_display = ('name',)
+    search_fields = ('name',)
+@admin.register(OpenAIModel)
+
+class OpenAIModelAdmin(admin.ModelAdmin):
     list_display = ('name',)
     search_fields = ('name',)
 
