@@ -160,8 +160,6 @@ def send_to_oobabooga(conversation, credits_object):
         if response.status_code == 200:
             response_json = response.json()
             assistant_message = response_json['choices'][0]['message']['content']
-            if 'Nick Adam:' in assistant_message:
-                assistant_message = assistant_message.split('Nick Adam:')[0].strip()
             credits_object.credits -= 1
             credits_object.save()
             return assistant_message
