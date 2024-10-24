@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from django.core.files.base import ContentFile
 from django.db.models import Q
 
-from .models import Conversation, Message, Credits, Prompt, MessageReaction, OllamaModel
+from .models import Conversation, Message, Credits, Prompt, MessageReaction, OllamaModel, OpenAIModel,NebiusModel
 from .forms import CustomPasswordChangeForm, OTPEnableForm, CustomAuthenticationForm, BackendAPIChoiceForm
 
 import os
@@ -71,30 +71,6 @@ def check_img_api_status():
 # ==============================================================================
 # Section 2: External API Integrations
 # ==============================================================================
-
-
-def sync_ollama_models():
-    """
-    Synchronizes Ollama models from the API with the database.
-
-    Returns:
-        bool: True if successful, False otherwise.
-    """
-    try:
-        response = requests.get(f"{ollama_url}/api/tags")
-        if response.status_code == 200:
-            data = response.json()
-            api_models = {model['name'] for model in data.get('models', [])}
-            for name in api_models:
-                OllamaModel.objects.get_or_create(name=name)
-            OllamaModel.objects.exclude(name__in=api_models).delete()           
-            return True
-        else:
-            print(f"Error syncing Ollama models: {response.text}")
-            return False
-    except Exception as e:
-        print(f"Error syncing Ollama models: {e}")
-        return False
     
 def send_to_openai(conversation, credits_object, backend_api):
     """
@@ -649,7 +625,6 @@ def profile_view(request):
     """
     profile = request.user.profile
     qr_code_base64 = None
-    sync_ollama_models()
     if request.method == 'POST':
         form = CustomPasswordChangeForm(request.user, request.POST)
         otp_form = OTPEnableForm()
