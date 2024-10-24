@@ -36,6 +36,6 @@ class OpenAIModelAdmin(admin.ModelAdmin):
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'backend_api_choice', 'selected_model', 'selected_character', 'selected_ollama_model','otp_enabled')
+    list_display = ('user', 'backend_api_choice', 'selected_model', 'selected_character', 'selected_ollama_model','selected_openai_model','otp_enabled')
     list_filter = ('backend_api_choice', 'otp_enabled')
     search_fields = ('user__username',)

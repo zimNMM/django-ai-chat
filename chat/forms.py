@@ -34,27 +34,30 @@ class BackendAPIChoiceForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super(BackendAPIChoiceForm, self).__init__(*args, **kwargs)
         backend_api = self.instance.backend_api_choice or self.initial.get('backend_api_choice')
+        
+        self.fields['selected_model'].required = False
+        self.fields['selected_character'].required = False
+        self.fields['selected_ollama_model'].required = False
+        self.fields['selected_openai_model'].required = False
+
+        self.fields['selected_model'].queryset = NebiusModel.objects.all()
+        self.fields['selected_character'].queryset = OobaboogaCharacter.objects.all()
+        self.fields['selected_ollama_model'].queryset = OllamaModel.objects.all()
+        self.fields['selected_openai_model'].queryset = OpenAIModel.objects.all()
+
         if backend_api == 'nebius':
-            self.fields['selected_model'].queryset = NebiusModel.objects.all()
-            self.fields['selected_model'].required = True
             self.fields['selected_character'].widget = forms.HiddenInput()
             self.fields['selected_ollama_model'].widget = forms.HiddenInput()
             self.fields['selected_openai_model'].widget = forms.HiddenInput()
         elif backend_api == 'oobabooga':
-            self.fields['selected_character'].queryset = OobaboogaCharacter.objects.all()
-            self.fields['selected_character'].required = True
             self.fields['selected_model'].widget = forms.HiddenInput()
             self.fields['selected_ollama_model'].widget = forms.HiddenInput()
             self.fields['selected_openai_model'].widget = forms.HiddenInput()
         elif backend_api == 'ollama':
-            self.fields['selected_ollama_model'].queryset = OllamaModel.objects.all()
-            self.fields['selected_ollama_model'].required = True
             self.fields['selected_model'].widget = forms.HiddenInput()
             self.fields['selected_character'].widget = forms.HiddenInput()
             self.fields['selected_openai_model'].widget = forms.HiddenInput()
         elif backend_api == 'openai':
-            self.fields['selected_openai_model'].queryset = OpenAIModel.objects.all()
-            self.fields['selected_openai_model'].required = True
             self.fields['selected_model'].widget = forms.HiddenInput()
             self.fields['selected_character'].widget = forms.HiddenInput()
             self.fields['selected_ollama_model'].widget = forms.HiddenInput()
@@ -63,6 +66,7 @@ class BackendAPIChoiceForm(forms.ModelForm):
             self.fields['selected_character'].widget = forms.HiddenInput()
             self.fields['selected_ollama_model'].widget = forms.HiddenInput()
             self.fields['selected_openai_model'].widget = forms.HiddenInput()
+
 
 class CustomPasswordChangeForm(PasswordChangeForm):
     old_password = forms.CharField(
