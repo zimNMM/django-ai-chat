@@ -308,6 +308,10 @@
                         li.appendChild(buttonsContainer);
                         convList.appendChild(li);
                     });
+
+                    if (currentConversationId && !conversations.some(conv => conv.id == currentConversationId)) {
+                        resetChatWindow();
+                    }
                 })
                 .catch(error => {
                     console.error('Error loading conversations:', error);
@@ -331,6 +335,20 @@
                 }
             });
         }
+        function resetChatWindow() {
+            currentConversationId = null;
+            document.getElementById('chat-window').innerHTML = '';
+            document.getElementById('conversation-title').textContent = 'Select a conversation or start a new one.';
+            document.getElementById('message-input').value = '';
+        }
+
+        function clearSearchResults() {
+            const searchInput = document.getElementById('searchInput');
+            const searchResults = document.getElementById('searchResults');
+            searchInput.value = '';
+            searchResults.innerHTML = '';
+            searchResults.classList.remove('show');
+        }
         function deleteConversation(conversationId) {
             const modal = document.getElementById('delete-modal');
             modal.style.display = 'block';
@@ -343,14 +361,12 @@
                 }).then(response => {
                     if (response.data.status === 'success') {
                         if (currentConversationId === conversationId) {
-                            currentConversationId = null;
-                            document.getElementById('chat-window').innerHTML = '';
-                            document.getElementById('conversation-title').textContent = 'Select a conversation or start a new one.';
-
+                            resetChatWindow();
                         }
-                        window.location.reload();
                         loadConversations();
                         modal.style.display = 'none';
+                        clearSearchResults();
+                        focusMessageInput();
                     } else {
                         alert('Error deleting conversation');
                     }
@@ -469,14 +485,25 @@
                 lastBotMessage.closest('.mb-4').remove();
             }
             document.getElementById('message-input').disabled = true;
+            const originalBotMessage = lastBotMessage.innerHTML;
+            const originalMessageContent = lastBotMessage.cloneNode(true);
+            const copyBtn = originalMessageContent.querySelector('.copy-btn');
+            const regenerateBtn = originalMessageContent.querySelector('.regenerate-btn');
+            const reactionContainer = originalMessageContent.querySelector('div[class*="mt-6"]');
+            
+            if (copyBtn) copyBtn.remove();
+            if (regenerateBtn) regenerateBtn.remove();
+            if (reactionContainer) reactionContainer.remove();
+            const currentConvId = currentConversationId;
+
             axios.post("{% url 'regenerate_response' %}", {
                 conversation_id: currentConversationId,
             }).then(response => {
+                if (currentConvId === currentConversationId) {
                 const botDiv = document.createElement('div');
                 botDiv.classList.add('mb-4', 'flex', 'justify-start');
                 
                 const parsedResponse = marked.parse(sanitizeMarkdown(response.data.response));
-                
                 botDiv.innerHTML = `
                     <div class="relative max-w-md rounded-lg px-4 py-2 bg-gray-700 text-white shadow-md chat-bubble">
                         ${parsedResponse}
@@ -507,14 +534,121 @@
                 chatWindow.appendChild(botDiv);
                 chatWindow.scrollTop = chatWindow.scrollHeight;
                 document.querySelector('.credits').textContent = parseInt(document.querySelector('.credits').textContent) - 1;
+                }
                 document.getElementById('message-input').disabled = false;
+                focusMessageInput();
 
             })
             .catch(error => {
                 console.error('Error regenerating response:', error);
-                alert('Failed to regenerate response. Please try again.');
-            });
-        }
+                if (error.response.status === 429) {
+                    alert('Please slow down regenerating responses.');
+                    const restoredBotDiv = document.createElement('div');
+                    restoredBotDiv.classList.add('mb-4', 'flex', 'justify-start');
+
+                    restoredBotDiv.innerHTML = `
+                        <div class="relative max-w-md rounded-lg px-4 py-2 bg-gray-700 text-white shadow-md chat-bubble">
+                            ${originalBotMessage}
+                        </div>
+                    `;
+                    chatWindow.appendChild(restoredBotDiv);
+                    const originalText = originalMessageContent.textContent.trim();
+                    const copyBtn = restoredBotDiv.querySelector('.copy-btn');
+                    if (copyBtn) {
+                        copyBtn.addEventListener('click', () => copyMessage(originalText));
+                    }
+                    
+                    const regenerateBtn = restoredBotDiv.querySelector('.regenerate-btn');
+                    if (regenerateBtn) {
+                        regenerateBtn.addEventListener('click', () => regenerateResponse());
+                    }
+                    restoredBotDiv.querySelectorAll('pre code').forEach((block, index) => {
+                        const copyCodeBtn = block.parentNode.querySelector('.copy-code-btn');
+                        if (copyCodeBtn) {
+                            copyCodeBtn.addEventListener('click', () => copyCodeBlock(block));
+                        }
+                    });
+
+                    axios.get("{% url 'get_message_id' %}", {
+                        params: { conversation_id: currentConversationId }
+                    })
+                    .then(response => {
+                        const messageId = response.data.message_id;
+                        const messageData = {
+                            id: messageId,
+                            sender: 'bot',
+                            text: restoredBotDiv.querySelector('.chat-bubble').textContent,
+                            reaction_counts: { up: 0, down: 0 },
+                            user_reaction: null
+                        };
+
+                        restoredBotDiv.querySelectorAll('.reaction-btn').forEach(button => {
+                            button.addEventListener('click', async (e) => {
+                                e.stopPropagation();
+                                const reactionType = button.dataset.reaction;
+                                const isUp = reactionType === 'up';
+                                
+                                const otherButton = button.parentElement.querySelector(`.reaction-btn[data-reaction="${isUp ? 'down' : 'up'}"]`);
+                                
+                                otherButton.classList.remove(isUp ? 'bg-red-600' : 'bg-green-600', 'text-white');
+                                otherButton.classList.add('bg-gray-700', 'hover:bg-gray-600', 'text-gray-300');
+                                
+                                if (button.classList.contains(isUp ? 'bg-green-600' : 'bg-red-600')) {
+                                    button.classList.remove(isUp ? 'bg-green-600' : 'bg-red-600', 'text-white');
+                                    button.classList.add('bg-gray-700', 'hover:bg-gray-600', 'text-gray-300');
+                                } else {
+                                    button.classList.remove('bg-gray-700', 'hover:bg-gray-600', 'text-gray-300');
+                                    button.classList.add(isUp ? 'bg-green-600' : 'bg-red-600', 'text-white');
+                                }
+                                
+                                try {
+                                    const response = await axios.post("{% url 'toggle_reaction' %}", {
+                                        message_id: messageId,
+                                        reaction: reactionType
+                                    });
+                                    
+                                    if (response.data.status === 'success') {
+                                        const counts = response.data.reaction_counts;
+                                        
+                                        restoredBotDiv.querySelectorAll('.reaction-btn').forEach(btn => {
+                                            const isUpBtn = btn.dataset.reaction === 'up';
+                                            const count = isUpBtn ? counts.up : counts.down;
+                                            const countSpan = btn.querySelector('.rounded-full');
+                                            countSpan.textContent = count;
+                                        });
+                                        
+                                        showNotification(`Reaction ${counts[reactionType] > (messageData.reaction_counts[reactionType] || 0) ? 'added' : 'removed'}!`, 'success');
+                                    }
+                                } catch (error) {
+                                    console.error('Error toggling reaction:', error);
+                                    
+                                    if (error.response && error.response.status === 429) {
+                                        alert("Please slow down with the reactions!");
+                                    } else {
+                                        showNotification('Failed to update reaction', 'error');
+                                    }
+                                    
+                                    button.classList.toggle('bg-gray-700');
+                                    button.classList.toggle('hover:bg-gray-600');
+                                    button.classList.toggle('text-gray-300');
+                                    button.classList.toggle(isUp ? 'bg-green-600' : 'bg-red-600');
+                                    button.classList.toggle('text-white');
+                                }
+                            });
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error getting message ID:', error);
+                    });
+                        } else {
+                            alert('Failed to regenerate response. Please try again.');
+
+                        }
+                        document.getElementById('message-input').disabled = false;
+                        focusMessageInput();
+                    });
+                }
+
         function copyCodeBlock(codeBlock) {
 
             code = codeBlock.textContent.replace(/&lt;/g, "<").replace(/&gt;/g, ">");
@@ -552,6 +686,7 @@
         }
 
         function copyMessage(text) {
+            
             navigator.clipboard.writeText(text).then(() => {
                 const notification = document.createElement('div');
                 notification.textContent = 'Copied!';
@@ -605,59 +740,65 @@
 
             messageInput.value = '';
             messageInput.disabled = true;
+
+            const currentConvId = currentConversationId;
+
+
             axios.post("{% url 'send_message' %}", {
                 message: message,
                 conversation_id: currentConversationId,
             }).then(response => {
-                if (!currentConversationId) {
-                    currentConversationId = response.data.conversation_id;
-                    loadConversations();
-                }
-                const botDiv = document.createElement('div');
-                botDiv.classList.add('mb-4', 'flex', 'justify-start');
-                
-                const parsedResponse = marked.parse(sanitizeMarkdown(response.data.response));
-                
-                botDiv.innerHTML = `
-                    <div class="relative max-w-md rounded-lg px-4 py-2 bg-gray-700 text-white shadow-md chat-bubble">
-                        ${parsedResponse}
-                        <button class="copy-btn" title="Copy message">
-                            <i class="fas fa-copy mr-1"></i> Copy
-                        </button>
-                        <button class="regenerate-btn flex items-center justify-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-lg hover:from-indigo-700 hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
-                        <i class="fas fa-sync-alt"></i>
-                        <span>Regenerate Response</span>
-                        </button>
-                    </div>
-                `;
-                createReactionButtons({
-                    sender: 'bot',
-                    text: response.data.response,
-                    id: response.data.message_id,
-                    reaction_counts: { up: 0, down: 0 },
-                    user_reaction: null
-                }, botDiv);
-                if (response.data.summary) {
-                    document.getElementById('conversation-title').textContent = response.data.summary;
-                    updateConversationSummary(response.data.conversation_id, response.data.summary);
-                }
-                const copyBtn = botDiv.querySelector('.copy-btn');
-                copyBtn.addEventListener('click', () => copyMessage(response.data.response));
+                if (currentConvId === currentConversationId) {
+                    if (!currentConversationId) {
+                        currentConversationId = response.data.conversation_id;
+                        loadConversations();
+                    }
+                    const botDiv = document.createElement('div');
+                    botDiv.classList.add('mb-4', 'flex', 'justify-start');
+                    
+                    const parsedResponse = marked.parse(sanitizeMarkdown(response.data.response));
+                    
+                    botDiv.innerHTML = `
+                        <div class="relative max-w-md rounded-lg px-4 py-2 bg-gray-700 text-white shadow-md chat-bubble">
+                            ${parsedResponse}
+                            <button class="copy-btn" title="Copy message">
+                                <i class="fas fa-copy mr-1"></i> Copy
+                            </button>
+                            <button class="regenerate-btn flex items-center justify-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-lg hover:from-indigo-700 hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+                            <i class="fas fa-sync-alt"></i>
+                            <span>Regenerate Response</span>
+                            </button>
+                        </div>
+                    `;
+                    createReactionButtons({
+                        sender: 'bot',
+                        text: response.data.response,
+                        id: response.data.message_id,
+                        reaction_counts: { up: 0, down: 0 },
+                        user_reaction: null
+                    }, botDiv);
+                    if (response.data.summary) {
+                        document.getElementById('conversation-title').textContent = response.data.summary;
+                        updateConversationSummary(response.data.conversation_id, response.data.summary);
+                    }
+                    const copyBtn = botDiv.querySelector('.copy-btn');
+                    copyBtn.addEventListener('click', () => copyMessage(response.data.response));
 
-                const regenerateBtn = botDiv.querySelector('.regenerate-btn');
-                regenerateBtn.addEventListener('click', () => regenerateResponse());
+                    const regenerateBtn = botDiv.querySelector('.regenerate-btn');
+                    regenerateBtn.addEventListener('click', () => regenerateResponse());
 
-                chatWindow.appendChild(botDiv);
-                
-                botDiv.querySelectorAll('pre code').forEach((block) => {
-                    hljs.highlightElement(block);
-                });
-                
-                addCopyButtonsToCodeBlocks(botDiv);
-                
-                chatWindow.scrollTop = chatWindow.scrollHeight;
+                    chatWindow.appendChild(botDiv);
+                    
+                    botDiv.querySelectorAll('pre code').forEach((block) => {
+                        hljs.highlightElement(block);
+                    });
+                    
+                    addCopyButtonsToCodeBlocks(botDiv);
+                    
+                    chatWindow.scrollTop = chatWindow.scrollHeight;
+                    document.querySelector('.credits').textContent = parseInt(document.querySelector('.credits').textContent) - 1;
+                }
                 messageInput.disabled = false;
-                document.querySelector('.credits').textContent = parseInt(document.querySelector('.credits').textContent) - 1;
                 focusMessageInput();
             })
             .catch(error => {
@@ -709,7 +850,11 @@
                         }
                     })
                     .catch(error => {
-                        alert('Error deleting all conversations');
+                        if (error.response && error.response.status === 429) {
+                            alert("You can delete all conversations once every 30 minutes!");
+                        } else {
+                            alert('Error deleting all conversations');
+                        }
                         console.error('Delete all conversations error:', error);
                     });
             };
@@ -733,7 +878,17 @@
             })
             .catch(function (error) {
                 console.error('Error exporting conversations:', error);
-                alert('You don\'t have any conversations.');
+                if (error.response) {
+                    if (error.response.status === 404) {
+                        alert("You don't have any conversations.");
+                    } else if (error.response.status === 429) {
+                        alert("You can export once every hour.");
+                    } else {
+                        alert('Error exporting conversations.');
+                    }
+                } else {
+                    alert('Error exporting conversations.');
+                }
             });
         });
         function showShareModal(conversationUuid) {
@@ -995,7 +1150,12 @@
                                 }
                             } catch (error) {
                                 console.error('Error toggling reaction:', error);
-                                showNotification('Failed to update reaction', 'error');
+                                
+                                if (error.response && error.response.status === 429) {
+                                    alert("Please slow down with the reactions!");
+                                } else {
+                                    showNotification('Failed to update reaction', 'error');
+                                }
                                 
                                 button.classList.toggle('bg-gray-700');
                                 button.classList.toggle('hover:bg-gray-600');
@@ -1082,8 +1242,7 @@
                             currentConversationId = conversationId;
                             loadMessages();
                             highlightConversation(conversationId);
-                            searchResults.classList.remove('show');
-                            searchInput.value = '';
+                            clearSearchResults();
                         });
                     });
                 }

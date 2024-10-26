@@ -67,7 +67,7 @@ class ModelSyncThread(threading.Thread):
             
         except Exception as e:
             print(f"Error syncing OpenAI and Nebius models: {e}")
-
+            
     def sync_ollama_models(self):
         """Sync Ollama models."""
         try:

@@ -6,11 +6,14 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_GET
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.core.files.base import ContentFile
 from django.db.models import Q
+from django.core.cache import cache
+from django.conf import settings
+from django.urls import reverse
 
-from .models import Conversation, Message, Credits, Prompt, MessageReaction, OllamaModel, OpenAIModel,NebiusModel
+from .models import Conversation, Message, Credits, Prompt, MessageReaction
 from .forms import CustomPasswordChangeForm, OTPEnableForm, CustomAuthenticationForm, BackendAPIChoiceForm
 
 import os
@@ -24,17 +27,53 @@ import base64
 import uuid
 import socket
 from urllib.parse import urlparse
-from dotenv import load_dotenv
+from functools import wraps
+import time
 
-load_dotenv()
 
-ooba_url =  os.getenv("OOBABOOGA_URL")
-img_url = os.getenv("STABLEDIFFUSION_URL")
-ollama_url = os.getenv("OLLAMA_URL")
+ooba_url =  settings.OOBA_URL
+img_url = settings.SD_URL
+ollama_url = settings.OLLAMA_URL
 
 # ==============================================================================
 # Section 1: Utility Functions
 # ==============================================================================
+
+
+def rate_limit(key, limit, period):
+    """
+    Decorator to implement rate limiting for views.
+
+    Args:
+        key (str): A unique identifier for the rate limit.
+        limit (int): The maximum number of requests allowed within the period.
+        period (int): The time period in seconds for the rate limit.
+
+    Returns:
+        function: The decorated view function.
+
+    This decorator checks if the number of requests from a user exceeds
+    the specified limit within the given time period. If the limit is
+    exceeded, it returns an HTTP 429 Too Many Requests response.
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapped_view(request, *args, **kwargs):
+            cache_key = f"rate_limit:{key}:{request.user.id}"
+            now = time.time()
+            request_history = cache.get(cache_key, [])
+            
+            request_history = [t for t in request_history if now - t < period]
+            
+            if len(request_history) >= limit:
+                return HttpResponse("Rate limit exceeded", status=429)
+            
+            request_history.append(now)
+            cache.set(cache_key, request_history, period)
+            
+            return view_func(request, *args, **kwargs)
+        return wrapped_view
+    return decorator
 
 def check_api_status(url):
     """
@@ -112,6 +151,7 @@ def send_to_openai(conversation, credits_object, backend_api):
     for msg in messages:
         role = 'user' if msg.sender == 'user' else 'assistant'
         history.append({'role': role, 'content': msg.text})
+    print(history)
     try:
         response = openai_client.chat.completions.create(
             model=selected_model,
@@ -407,7 +447,7 @@ def delete_conversation(request):
             return JsonResponse({'error': str(e)}, status=400)
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
-
+@rate_limit("delete_all_conversations", limit=1, period=1800)
 @login_required
 def delete_all_conversations(request):
     """
@@ -448,6 +488,7 @@ def delete_user_account(request):
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
 @login_required
+@rate_limit("export_all_conversations", limit=1, period=3600)
 def export_all_conversations(request):
     """
     Exports all conversations of the user in JSON format.
@@ -562,7 +603,13 @@ def register(request):
             raw_password = form.cleaned_data.get('password1')
             user = authenticate(username=username, password=raw_password)
             login(request, user)
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'success', 'redirect_url': reverse('chat')})
             return redirect('chat')
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                errors = form.errors.as_json()
+                return JsonResponse({'status': 'error', 'message': 'Registration failed. Please check your input.', 'errors': errors})
     else:
         form = UserCreationForm()
     return render(request, 'register.html', {'form': form})
@@ -585,7 +632,12 @@ def custom_login(request):
         if form.is_valid():
             user = form.get_user()
             login(request, user)
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'success', 'redirect_url': reverse('chat')})
             return redirect('chat')
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'error', 'message': 'Invalid username or password.'})
     else:
         form = CustomAuthenticationForm(request)
 
@@ -593,7 +645,6 @@ def custom_login(request):
 
 @require_GET
 @login_required
-
 def get_prompts(request):
     """
     Retrieve all useful prompts from the database and return them as a JSON response.
@@ -692,6 +743,7 @@ def profile_view(request):
         backend_api_form = BackendAPIChoiceForm(instance=profile)
     return render(request, 'profile.html', {'form': form,'otp_form': otp_form,'profile': profile,'backend_api_form': backend_api_form,})
 
+@rate_limit("export_all_conversations", limit=2, period=15)
 @login_required
 def regenerate_response(request):
     """
@@ -731,6 +783,8 @@ def regenerate_response(request):
             return JsonResponse({'error': str(e)}, status=400)
 
     return JsonResponse({'error': 'Invalid request'}, status=400)
+
+@rate_limit("toggle_reaction", limit=10, period=15)
 @login_required
 def toggle_reaction(request):
     """
@@ -779,6 +833,7 @@ def toggle_reaction(request):
             return JsonResponse({'error': str(e)}, status=400)
             
     return JsonResponse({'error': 'Invalid request'}, status=400)
+
 @login_required
 def search_conversations(request):
     """
@@ -822,3 +877,22 @@ def search_conversations(request):
         })
     
     return JsonResponse({'results': results})
+
+@login_required
+def get_message_id(request):
+    """
+    Get the ID of the last assistant message in a conversation.
+
+    Args:
+        request (HttpRequest): The HTTP request object.
+
+    Returns:
+        JsonResponse: Contains the message ID or an error message.
+    """
+    conversation_id = request.GET.get('conversation_id')
+    conversation = get_object_or_404(Conversation, id=conversation_id, user=request.user)
+    last_bot_message = conversation.messages.filter(sender='bot').last()
+    if last_bot_message:
+        return JsonResponse({'message_id': last_bot_message.id})
+    else:
+        return JsonResponse({'error': 'No bot message found'}, status=404)

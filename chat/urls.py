@@ -25,6 +25,6 @@ urlpatterns = [
     path('ajax/regenerate_response/', views.regenerate_response, name='regenerate_response'),
     path('ajax/toggle_reaction/', views.toggle_reaction, name='toggle_reaction'),
     path('ajax/search_conversations/', views.search_conversations, name='search_conversations'),
+    path('ajax/get_message_id/', views.get_message_id, name='get_message_id'),
     path('conversations/<uuid:uuid>/', views.public_conversation_view, name='public_conversation'),
-
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

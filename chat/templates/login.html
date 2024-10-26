@@ -38,6 +38,10 @@
             <form method="post">
                 {% csrf_token %}
                 
+                <div id="csrf_error" class="mb-4 text-red-500" style="display: none;">
+                    <p>There was an error with your request. Please try refreshing the page or clearing your browser cache.</p>
+                </div>
+                
                 <div class="mb-4">
                     <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium mb-1 text-gray-300">
                         Username
@@ -99,3 +103,35 @@
     </div>
 </body>
 </html>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                window.location.href = data.redirect_url;
+            } else if (data.status === 'error') {
+                const errorDiv = document.getElementById('csrf_error');
+                errorDiv.style.display = 'block';
+                errorDiv.innerHTML = `<p>${data.message}</p>`;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            const errorDiv = document.getElementById('csrf_error');
+            errorDiv.style.display = 'block';
+            errorDiv.innerHTML = '<p>An unexpected error occurred. Please try again.</p>';
+        });
+    });
+});
+</script>

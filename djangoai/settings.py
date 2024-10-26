@@ -3,8 +3,13 @@
 from pathlib import Path
 from django.contrib.messages import constants as messages
 import os
+from dotenv import load_dotenv
 
+load_dotenv()
 
+OOBA_URL =  os.getenv("OOBABOOGA_URL")
+SD_URL = os.getenv("STABLEDIFFUSION_URL")
+OLLAMA_URL = os.getenv("OLLAMA_URL")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -14,13 +19,13 @@ DEBUG = True
 
 # If run through cloudflared tunnel set the urls!
 
-CSRF_TRUSTED_ORIGINS = ['https://yoururl.com', 'https://www.yoururl.com']
+CSRF_TRUSTED_ORIGINS = ['https://url.com', 'https://www.url.com']
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
 
-ALLOWED_HOSTS = ["127.0.0.1","yoururl.com","www.yoururl.com"]
+ALLOWED_HOSTS = ["127.0.0.1","url.com","www.url.com"]
 
 
 INSTALLED_APPS = [
